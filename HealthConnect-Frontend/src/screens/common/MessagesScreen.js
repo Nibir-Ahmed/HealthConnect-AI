@@ -105,6 +105,7 @@ const MessagesScreen = () => {
         <FlatList
           data={inbox}
           keyExtractor={(item) => item.partner.id.toString()}
+          style={{ flex: 1 }}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
         />

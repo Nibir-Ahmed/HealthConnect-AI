@@ -96,16 +96,36 @@ const DoctorProfileScreen = ({ route, navigation }) => {
   const activeDay = availableSlots[selectedDayIndex];
 
   const handleBook = () => {
-    if (!activeDay || selectedTimeIndex === -1) {
+    let chosenTime = activeDay?.times?.[selectedTimeIndex];
+    if (!chosenTime && activeDay?.times?.length > 0) {
+      chosenTime = activeDay.times[0];
+    }
+    if (!activeDay || !chosenTime) {
       Alert.alert('Booking Error', 'Please select a consultation time slot.');
       return;
     }
-    const chosenTime = activeDay.times[selectedTimeIndex];
     navigation.navigate('AppointmentConfirm', {
       doctor,
       date: activeDay.date.toISOString(), 
       time: chosenTime
     });
+  };
+
+  const isOnline = doctor.User?.isOnline !== false && doctor.isOnline !== false;
+
+  const handleDirectChat = async () => {
+    try {
+      await api.post('/appointments', {
+        doctorId: doctor.id,
+        date: new Date().toISOString().split('T')[0],
+        time: '10:00:00',
+        type: 'chat',
+        reason: 'Direct Chat Consultation'
+      });
+    } catch (e) {
+      console.log('Background appointment sync:', e.message);
+    }
+    navigation.navigate('DoctorChat', { doctor });
   };
 
   return (
@@ -122,9 +142,15 @@ const DoctorProfileScreen = ({ route, navigation }) => {
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
           {/* Doctor Info Card */}
           <View style={styles.profileCard}>
-            <Avatar uri={doctor.User?.avatar || doctor.avatar} size={100} />
+            <Avatar uri={doctor.User?.avatar || doctor.avatar} size={100} online={isOnline} />
             <Text style={[styles.name, { marginTop: 16 }]}>{doctor.User?.name || doctor.name}</Text>
             <Text style={styles.specialty}>{doctor.specialty}</Text>
+            <View style={[styles.onlinePill, { backgroundColor: isOnline ? 'rgba(34, 197, 94, 0.12)' : 'rgba(156, 163, 175, 0.12)' }]}>
+              <View style={[styles.onlineDot, { backgroundColor: isOnline ? '#22C55E' : '#9CA3AF' }]} />
+              <Text style={[styles.onlineText, { color: isOnline ? '#15803D' : '#6B7280' }]}>
+                {isOnline ? 'Online • Available Now' : 'Offline'}
+              </Text>
+            </View>
             <Text style={styles.university}>{doctor.university}</Text>
 
             <View style={styles.statsRow}>
@@ -211,9 +237,13 @@ const DoctorProfileScreen = ({ route, navigation }) => {
         </ScrollView>
       </View>
 
-      {/* Booking Action */}
-      <View style={styles.footer}>
-        <Button title="Consult with Doctor" onPress={handleBook} />
+      {/* Booking & Direct Chat Action */}
+      <View style={styles.footerRow}>
+        <TouchableOpacity style={styles.directChatBtn} onPress={handleDirectChat}>
+          <Ionicons name="chatbubble-ellipses" size={20} color={colors.white} />
+          <Text style={styles.directChatBtnText}>Start Direct Chat</Text>
+        </TouchableOpacity>
+        <Button title="Book Consultation" onPress={handleBook} style={{ flex: 1 }} />
       </View>
     </SafeAreaView>
   );
@@ -265,10 +295,29 @@ const styles = StyleSheet.create({
     color: colors.textPrimary
   },
   specialty: {
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
     color: colors.primary,
+    fontWeight: '600',
     marginTop: 4
+  },
+  onlinePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 14,
+    marginTop: 8,
+    alignSelf: 'center'
+  },
+  onlineDot: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginRight: 6
+  },
+  onlineText: {
+    fontSize: 12,
+    fontWeight: '700'
   },
   university: {
     fontSize: 13,
@@ -364,6 +413,29 @@ const styles = StyleSheet.create({
     color: colors.textSecondary
   },
   activeTimeText: {
+    color: colors.white
+  },
+  footerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: colors.white,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: 12
+  },
+  directChatBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#3B82F6',
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    gap: 8
+  },
+  directChatBtnText: {
+    fontSize: 14,
+    fontWeight: '700',
     color: colors.white
   },
   footer: {

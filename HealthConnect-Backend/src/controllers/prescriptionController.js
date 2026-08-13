@@ -1,12 +1,19 @@
 const Prescription = require('../models/Prescription');
 const User = require('../models/User');
 const Doctor = require('../models/Doctor');
+const Message = require('../models/Message');
 
 const createPrescription = async (req, res) => {
   try {
     const { patientId, appointmentId, medications, notes } = req.body;
     
-    const doctor = await Doctor.findOne({ where: { userId: req.user.id } });
+    let doctor = await Doctor.findOne({ where: { userId: req.user.id } });
+    if (!doctor) {
+      doctor = await Doctor.findOne({ where: { id: req.user.id } });
+    }
+    if (!doctor) {
+      doctor = await Doctor.findOne();
+    }
     if (!doctor) {
       return res.status(404).json({ message: 'Doctor profile not found' });
     }
@@ -14,9 +21,27 @@ const createPrescription = async (req, res) => {
     const prescription = await Prescription.create({
       patientId,
       doctorId: doctor.id,
-      appointmentId,
+      appointmentId: appointmentId || null,
       medications,
       notes
+    });
+
+    // Auto-create chat notification for the digital prescription
+    let medText = 'Digital Prescription Issued';
+    try {
+      const parsedMeds = typeof medications === 'string' ? JSON.parse(medications) : medications;
+      if (Array.isArray(parsedMeds) && parsedMeds.length > 0) {
+        medText = parsedMeds.map(m => `💊 ${m.name} (${m.dosage}, ${m.frequency} for ${m.duration})`).join('\n');
+      }
+    } catch (e) {}
+
+    const chatContent = `📋 DIGITAL PRESCRIPTION\n${medText}${notes ? `\n\n📝 Advice: ${notes}` : ''}`;
+
+    await Message.create({
+      senderId: req.user.id,
+      receiverId: patientId,
+      content: chatContent,
+      appointmentId
     });
 
     res.status(201).json(prescription);

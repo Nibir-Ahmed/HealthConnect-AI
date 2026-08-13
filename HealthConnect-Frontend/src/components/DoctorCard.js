@@ -13,7 +13,15 @@ const DoctorCard = ({ doctor, onPress }) => {
       <View style={styles.topRow}>
         <Avatar uri={avatar} size={56} online={isOnline} />
         <View style={styles.info}>
-          <Text style={styles.name} numberOfLines={1}>{name}</Text>
+          <View style={styles.nameRow}>
+            <Text style={styles.name} numberOfLines={1}>{name}</Text>
+            <View style={[styles.onlineBadge, { backgroundColor: isOnline !== false ? 'rgba(34, 197, 94, 0.12)' : 'rgba(156, 163, 175, 0.12)' }]}>
+              <View style={[styles.onlineDot, { backgroundColor: isOnline !== false ? '#22C55E' : '#9CA3AF' }]} />
+              <Text style={[styles.onlineText, { color: isOnline !== false ? '#15803D' : '#6B7280' }]}>
+                {isOnline !== false ? 'Online' : 'Offline'}
+              </Text>
+            </View>
+          </View>
           <Text style={styles.specialty} numberOfLines={1}>{specialty}</Text>
           <View style={styles.ratingRow}>
             <Ionicons name="star" size={14} color="#F4B740" />
@@ -51,10 +59,34 @@ const styles = StyleSheet.create({
     flex: 1,
     marginLeft: 14
   },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between'
+  },
   name: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.textPrimary
+    color: colors.textPrimary,
+    flex: 1
+  },
+  onlineBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginLeft: 6
+  },
+  onlineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 4
+  },
+  onlineText: {
+    fontSize: 11,
+    fontWeight: '700'
   },
   specialty: {
     fontSize: 13,

@@ -1,55 +1,80 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, SafeAreaView, FlatList, TextInput, ScrollView, TouchableOpacity, useWindowDimensions, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import api from '../../services/api';
+import { getBlogs } from '../../services/blogsApi';
 import BlogCard from '../../components/BlogCard';
 import colors from '../../utils/colors';
-const CATEGORIES = ['All', 'First Aid', 'Nutrition', 'Mental Health', 'Disease Awareness'];
-const BlogFeedScreen = ({ navigation }) => {
+import { useAuth } from '../../context/AuthContext';
+
+const CATEGORIES = ['All', 'My Articles', 'First Aid', 'Nutrition', 'Mental Health', 'Disease Awareness'];
+
+const BlogFeedScreen = ({ route, navigation }) => {
   const { width, height: windowHeight } = useWindowDimensions();
+  const { user } = useAuth();
   const isLargeScreen = width > 768;
+  const initialCategory = route.params?.filter === 'my' ? 'My Articles' : 'All';
   const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
   const [blogs, setBlogs] = useState([]);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (route.params?.filter === 'my') {
+      setSelectedCategory('My Articles');
+    }
+  }, [route.params?.filter]);
+
   useEffect(() => {
     fetchBlogs();
-  }, []);
+  }, [selectedCategory]);
+
   const fetchBlogs = async () => {
     try {
-      const response = await api.get('/blogs');
-      const formatted = response.data.map((blog, index) => {
-        // use tags[0] as category, fallback to 'Health'
+      setLoading(true);
+      const data = await getBlogs();
+      const formatted = (data || []).map((blog) => {
         const category = blog.tags && blog.tags.length > 0 ? blog.tags[0] : 'Health';
         return {
           ...blog,
-          id: blog.id.toString(),
+          id: String(blog.id),
           category,
-          author: blog.author || { name: 'Dr. Unknown' },
-          coverImage: blog.coverImage || `https://picsum.photos/seed/${blog.id}/400/200`,
-          readTime: blog.tags && blog.tags.length > 1 ? blog.tags[1] : '5 min read',
+          author: blog.author || { name: 'Health Professional' },
+          coverImage: blog.coverImage || 'https://images.unsplash.com/photo-1505751172876-fa1923c5c528?w=500',
+          readTime: '5 min read',
           likes: blog.likes || 0,
-          isSaved: blog.isSaved || false,
-          isLiked: blog.isLiked || false
+          isSaved: blog.isSaved || false
         };
       });
       setBlogs(formatted);
     } catch (error) {
-      console.error('Error fetching blogs:', error);
+      console.error('Error fetching blogs from Firestore:', error);
     } finally {
       setLoading(false);
     }
   };
+
+
+  const categoriesToDisplay = (user?.role === 'doctor' || user?.role === 'admin')
+    ? CATEGORIES
+    : CATEGORIES.filter(c => c !== 'My Articles');
+
   const filteredBlogs = blogs.filter((blog) => {
     const matchesSearch = blog.title?.toLowerCase().includes(search.toLowerCase()) || 
                           (blog.content && blog.content.toLowerCase().includes(search.toLowerCase()));
-    const matchesCategory = selectedCategory === 'All' || blog.category === selectedCategory;
+    const matchesCategory = selectedCategory === 'All' || selectedCategory === 'My Articles' || blog.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Health Library</Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+          {navigation.canGoBack() && (
+            <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+              <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+            </TouchableOpacity>
+          )}
+          <Text style={styles.headerTitle}>Health Library</Text>
+        </View>
         <TouchableOpacity style={styles.saveHeaderIcon} onPress={() => navigation.navigate('SavedBlogs')}>
           <Ionicons name="bookmark-outline" size={22} color={colors.textPrimary} />
         </TouchableOpacity>
@@ -77,7 +102,7 @@ const BlogFeedScreen = ({ navigation }) => {
       {/* Category Chips */}
       <View style={styles.filterContainer}>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chipScroll}>
-          {CATEGORIES.map((cat) => (
+          {categoriesToDisplay.map((cat) => (
             <TouchableOpacity
               key={cat}
               style={[
@@ -133,8 +158,7 @@ const BlogFeedScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    overflow: 'hidden'
+    backgroundColor: colors.background
   },
   header: {
     flexDirection: 'row',
@@ -150,6 +174,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '700',
     color: colors.textPrimary
+  },
+  backBtn: {
+    marginRight: 12,
+    padding: 4
   },
   saveHeaderIcon: {
     padding: 4

@@ -59,7 +59,7 @@ const AppointmentConfirmScreen = ({ route, navigation }) => {
           <Text style={styles.subtitle}>Please review your consultation details before confirming.</Text>
           <Card style={styles.detailsCard}>
             <View style={styles.doctorInfo}>
-              <Avatar uri={doctor.User?.avatar} size={50} />
+              <Avatar uri={doctor.User?.avatar || doctor.avatar} size={50} />
               <View style={styles.doctorText}>
                 <Text style={styles.doctorName}>{doctor.User?.name || doctor.name}</Text>
                 <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>
@@ -107,7 +107,7 @@ const AppointmentConfirmScreen = ({ route, navigation }) => {
         {/* Details Card */}
         <Card style={styles.detailsCard}>
           <View style={styles.doctorInfo}>
-            <Avatar uri={doctor.User?.avatar} size={50} />
+            <Avatar uri={doctor.User?.avatar || doctor.avatar} size={50} />
             <View style={styles.doctorText}>
               <Text style={styles.doctorName}>{doctor.User?.name || doctor.name}</Text>
               <Text style={styles.doctorSpecialty}>{doctor.specialty}</Text>

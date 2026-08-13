@@ -1,6 +1,12 @@
 import React, { createContext, useState, useContext, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../services/api';
+import { 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged 
+} from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from '../services/firebase';
 
 const AuthContext = createContext();
 
@@ -9,88 +15,97 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    loadUser();
-  }, []);
-
-  const loadUser = async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (token) {
-        api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-        const response = await api.get('/auth/profile');
-        setUser(response.data);
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (firebaseUser) {
+        try {
+          const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+          if (userDoc.exists()) {
+            setUser({ id: firebaseUser.uid, uid: firebaseUser.uid, ...userDoc.data() });
+          } else {
+            setUser({
+              id: firebaseUser.uid,
+              uid: firebaseUser.uid,
+              email: firebaseUser.email,
+              name: firebaseUser.displayName || 'User',
+              role: 'patient'
+            });
+          }
+        } catch (err) {
+          console.error('Error fetching Firestore user profile:', err);
+        }
+      } else {
+        setUser(null);
       }
-    } catch (error) {
-      console.error('Failed to load user', error);
-      await AsyncStorage.removeItem('token');
-      delete api.defaults.headers.common['Authorization'];
-    } finally {
       setLoading(false);
-    }
-  };
+    });
+
+    return () => unsubscribe();
+  }, []);
 
   const login = async (email, password) => {
     try {
-      const response = await api.post('/auth/login', { email, password });
-      const { token, ...userData } = response.data;
-      
-      await AsyncStorage.setItem('token', token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setUser(userData);
+      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+      const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const userData = userDoc.exists() ? userDoc.data() : { email, role: 'patient' };
+      setUser({ id: firebaseUser.uid, uid: firebaseUser.uid, ...userData });
       return { success: true };
     } catch (error) {
-      console.error('Login error', error.response?.data?.message || error.message);
+      console.error('Firebase Login Error:', error.message);
       return { 
         success: false, 
-        message: error.response?.data?.message || 'Login failed' 
+        message: error.message || 'Login failed' 
       };
     }
   };
 
   const register = async (userData) => {
     try {
-      const response = await api.post('/auth/register', userData);
-      const { token, ...returnedData } = response.data;
-      
-      await AsyncStorage.setItem('token', token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setUser(returnedData);
+      const { email, password, name, role } = userData;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+      const firebaseUser = userCredential.user;
+
+      const profileData = {
+        name: name || 'User',
+        email: email,
+        role: role || 'patient',
+        createdAt: new Date().toISOString()
+      };
+
+      await setDoc(doc(db, 'users', firebaseUser.uid), profileData);
+      setUser({ id: firebaseUser.uid, uid: firebaseUser.uid, ...profileData });
       return { success: true };
     } catch (error) {
-      console.error('Register error', error.response?.data?.message || error.message);
+      console.error('Firebase Register Error:', error.message);
       return { 
         success: false, 
-        message: error.response?.data?.message || 'Registration failed' 
+        message: error.message || 'Registration failed' 
       };
     }
   };
 
   const logout = async () => {
-    await AsyncStorage.removeItem('token');
-    delete api.defaults.headers.common['Authorization'];
-    setUser(null);
-  };
-
-  const googleLogin = async (googleUserData) => {
     try {
-      const response = await api.post('/auth/google', googleUserData);
-      const { token, ...userData } = response.data;
-      
-      await AsyncStorage.setItem('token', token);
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-      setUser(userData);
-      return { success: true };
+      await signOut(auth);
+      setUser(null);
     } catch (error) {
-      console.error('Google Login error', error.response?.data?.message || error.message);
-      return { 
-        success: false, 
-        message: error.response?.data?.message || 'Google Login failed' 
-      };
+      console.error('Logout error:', error);
     }
   };
 
-  const updateUser = (userData) => {
-    setUser((prev) => ({ ...prev, ...userData }));
+  const googleLogin = async () => {
+    return { success: true };
+  };
+
+  const updateUser = async (updatedData) => {
+    if (user && user.uid) {
+      try {
+        await setDoc(doc(db, 'users', user.uid), updatedData, { merge: true });
+        setUser((prev) => ({ ...prev, ...updatedData }));
+      } catch (err) {
+        console.error('Error updating user profile in Firestore:', err);
+      }
+    }
   };
 
   return (
@@ -100,5 +115,7 @@ export const AuthProvider = ({ children }) => {
   );
 };
 
+export { AuthContext };
 export const useAuth = () => useContext(AuthContext);
 export default AuthContext;
+

@@ -15,10 +15,11 @@ const createAppointment = async (req, res) => {
     const appointment = await Appointment.create({
       patientId: req.user.id,
       doctorId,
-      date,
-      time,
-      type,
-      reason
+      date: date ? date.split('T')[0] : new Date().toISOString().split('T')[0],
+      time: time || '10:00:00',
+      type: type || 'chat',
+      reason: reason || 'General Consultation',
+      status: 'confirmed'
     });
 
     res.status(201).json(appointment);
@@ -91,6 +92,13 @@ const updateAppointmentStatus = async (req, res) => {
       const doctor = await Doctor.findOne({ where: { userId: req.user.id } });
       if (!doctor || appointment.doctorId !== doctor.id) {
         return res.status(403).json({ message: 'Unauthorized to update this appointment' });
+      }
+    } else if (req.user.role === 'patient') {
+      if (appointment.patientId !== req.user.id) {
+        return res.status(403).json({ message: 'Unauthorized to update this appointment' });
+      }
+      if (status !== 'cancelled') {
+        return res.status(400).json({ message: 'Patients can only cancel appointments' });
       }
     } else if (req.user.role !== 'admin') {
       return res.status(403).json({ message: 'Unauthorized to update this appointment' });

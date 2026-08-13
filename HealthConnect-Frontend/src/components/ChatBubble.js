@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Linking, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../utils/colors';
+import { SERVER_URL } from '../utils/config';
 
 import Markdown from 'react-native-markdown-display';
 
@@ -10,9 +11,7 @@ const ChatBubble = ({ message }) => {
 
   const handleOpenAttachment = () => {
     if (attachmentUrl) {
-      // For local testing, we might not be able to link. In production, this opens the URL.
-      // We will construct the full URL if it's relative
-      const fullUrl = attachmentUrl.startsWith('/') ? `http://10.0.2.2:5000${attachmentUrl}` : attachmentUrl;
+      const fullUrl = attachmentUrl.startsWith('/') ? `${SERVER_URL}${attachmentUrl}` : attachmentUrl;
       Linking.openURL(fullUrl).catch(err => console.error("Couldn't load page", err));
     }
   };
@@ -48,7 +47,7 @@ const ChatBubble = ({ message }) => {
             onPress={handleOpenAttachment}
           >
             {attachmentType === 'image' || attachmentUrl.match(/\.(jpeg|jpg|gif|png)$/) ? (
-              <Image source={{ uri: attachmentUrl.startsWith('/') ? `http://10.0.2.2:5000${attachmentUrl}` : attachmentUrl }} style={styles.attachmentImage} />
+              <Image source={{ uri: attachmentUrl.startsWith('/') ? `${SERVER_URL}${attachmentUrl}` : attachmentUrl }} style={styles.attachmentImage} resizeMode="cover" />
             ) : (
               <>
                 <Ionicons name="document-text" size={32} color={isMe ? colors.white : colors.primary} />
@@ -135,8 +134,7 @@ const styles = StyleSheet.create({
   attachmentImage: {
     width: 200,
     height: 150,
-    borderRadius: 8,
-    resizeMode: 'cover'
+    borderRadius: 8
   },
   attachmentText: {
     fontSize: 13,

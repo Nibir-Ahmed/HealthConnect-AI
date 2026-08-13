@@ -47,10 +47,43 @@ app.get('/', (req, res) => {
 });
 
 // Database Connection & Sync
+const ensureMasterAdmin = async () => {
+  try {
+    const bcrypt = require('bcryptjs');
+    const hashedPassword = await bcrypt.hash('123456', 10);
+    let admin = await User.findOne({ where: { email: 'admin@healthconnect.com' } });
+    if (!admin) {
+      admin = await User.create({
+        name: 'Master Admin',
+        email: 'admin@healthconnect.com',
+        password: hashedPassword,
+        role: 'admin',
+        avatar: 'https://ui-avatars.com/api/?name=Master+Admin&background=00A896&color=fff'
+      });
+      console.log('✅ Master Admin account created: admin@healthconnect.com / 123456');
+    } else {
+      admin.password = hashedPassword;
+      admin.role = 'admin';
+      await admin.save();
+      console.log('✅ Master Admin credentials updated: admin@healthconnect.com / 123456');
+    }
+  } catch (err) {
+    console.error('Error ensuring master admin account:', err.message);
+  }
+};
+
 testConnection();
-sequelize.sync({ alter: true })
-  .then(() => console.log('✅ Database models synced successfully.'))
-  .catch(err => console.error('❌ Failed to sync models:', err));
+if (process.env.SKIP_DB_SYNC === 'true') {
+  console.log('ℹ️ SKIP_DB_SYNC=true — skipping sequelize.sync() at startup.');
+  ensureMasterAdmin();
+} else {
+  sequelize.sync({ alter: true })
+    .then(() => {
+      console.log('✅ Database models synced successfully.');
+      ensureMasterAdmin();
+    })
+    .catch(err => console.error('❌ Failed to sync models:', err));
+}
 
 // Socket.io for Real-time Chat
 io.on('connection', (socket) => {

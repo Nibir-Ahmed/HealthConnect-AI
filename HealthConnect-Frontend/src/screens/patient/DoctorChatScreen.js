@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet,  ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -7,21 +7,25 @@ import ChatBubble from '../../components/ChatBubble';
 import HealthVaultModal from '../../components/HealthVaultModal';
 import colors from '../../utils/colors';
 import api from '../../services/api';
-import { io } from 'socket.io-client';
-import { AuthContext } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { db } from '../../services/firebase';
+import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
+
 
 const DoctorChatScreen = ({ route, navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
-  const { user } = useContext(AuthContext);
+  const { user } = useAuth();
   const appointment = route.params?.appointment;
   const doctor = appointment?.doctor || route.params?.doctor;
   
   const doctorName = doctor?.User?.name || doctor?.name || 'Dr. Unknown';
   const doctorSpecialty = doctor?.specialty || 'Specialist';
   const doctorAvatar = doctor?.User?.avatar || doctor?.avatar || require('../../../assets/images/doc_1.jpg');
-  const partnerId = doctor?.User?.id || doctor?.userId;
+  const partnerId = doctor?.User?.id || doctor?.userId || doctor?.id;
   
-  const roomId = appointment ? `appt_${appointment.id}` : `chat_${Math.min(user?.id || 0, partnerId || 0)}_${Math.max(user?.id || 0, partnerId || 0)}`;
+  const userRoomId = `chat_${Math.min(user?.id || 0, partnerId || 0)}_${Math.max(user?.id || 0, partnerId || 0)}`;
+  const apptRoomId = appointment?.id ? `appt_${appointment.id}` : null;
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
@@ -29,57 +33,55 @@ const DoctorChatScreen = ({ route, navigation }) => {
   const scrollViewRef = useRef();
   const socketRef = useRef(null);
 
+  const updateMessages = (updater) => {
+    setMessages((prev) => {
+      const updated = typeof updater === 'function' ? updater(prev) : [...prev, updater];
+      if (partnerId && user?.id) {
+        const cacheKey = `chat_cache_${user.id}_${partnerId}`;
+        AsyncStorage.setItem(cacheKey, JSON.stringify(updated)).catch(() => {});
+      }
+      return updated;
+    });
+  };
+
   useEffect(() => {
-    // 1. Fetch History
-    const fetchHistory = async () => {
-      if (!partnerId) return;
+    const cacheKey = `chat_cache_${user?.id}_${partnerId}`;
+
+    const loadCachedMessages = async () => {
+      if (!partnerId || !user?.id) return;
       try {
-        const response = await api.get(`/chat/${partnerId}`);
-        const formatted = response.data.map(msg => ({
-          id: msg.id.toString(),
-          senderId: msg.senderId.toString(),
-          senderName: msg.senderId === user.id ? user.name : doctorName,
-          text: msg.content,
-          attachmentUrl: msg.attachmentUrl,
-          attachmentType: msg.attachmentType,
-          timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isMe: msg.senderId === user.id
-        }));
-        setMessages(formatted);
-      } catch (error) {
-        console.error('Error fetching chat history:', error);
-      }
+        const cached = await AsyncStorage.getItem(cacheKey);
+        if (cached) {
+          setMessages(JSON.parse(cached));
+        }
+      } catch (e) {}
     };
-    fetchHistory();
+    loadCachedMessages();
 
-    // 2. Setup Socket
-    const BACKEND_URL = api.defaults.baseURL.replace('/api', '');
-    socketRef.current = io(BACKEND_URL);
+    // Real-time Firestore Chat Listener
+    const messagesRef = collection(db, 'messages');
+    const q = query(messagesRef, where('roomId', '==', userRoomId));
 
-    socketRef.current.on('connect', () => {
-      socketRef.current.emit('join_room', roomId);
-    });
-
-    socketRef.current.on('receive_message', (data) => {
-      if (data.senderId !== user.id) {
-        const newMsg = {
-          id: Math.random().toString(),
-          senderId: data.senderId.toString(),
-          senderName: doctorName,
-          text: data.content,
-          attachmentUrl: data.attachmentUrl,
-          attachmentType: data.attachmentType,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isMe: false
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const formatted = snapshot.docs.map((docSnap) => {
+        const msg = docSnap.data();
+        const isMe = String(msg.senderId) === String(user?.id);
+        return {
+          id: docSnap.id,
+          senderId: String(msg.senderId),
+          senderName: isMe ? user?.name : doctorName,
+          text: msg.text || msg.content || '',
+          attachmentUrl: msg.attachmentUrl || null,
+          attachmentType: msg.attachmentType || null,
+          timestamp: msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: isMe
         };
-        setMessages((prev) => [...prev, newMsg]);
-      }
+      });
+      setMessages(formatted);
     });
 
-    return () => {
-      socketRef.current.disconnect();
-    };
-  }, [partnerId, roomId, user.id, doctorName]);
+    return () => unsubscribe();
+  }, [partnerId, userRoomId, user?.id, doctorName]);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
@@ -87,16 +89,18 @@ const DoctorChatScreen = ({ route, navigation }) => {
     const textToSend = inputText;
     setInputText('');
 
-    // Optimistic UI update
-    const userMsg = {
-      id: Math.random().toString(),
-      senderId: user.id.toString(),
-      senderName: user.name,
-      text: textToSend,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isMe: true
-    };
-    setMessages((prev) => [...prev, userMsg]);
+    try {
+      await addDoc(collection(db, 'messages'), {
+        roomId: userRoomId,
+        senderId: String(user.id || user.uid),
+        receiverId: String(partnerId),
+        text: textToSend,
+        isRead: false,
+        createdAt: new Date().toISOString()
+      });
+    } catch (err) {
+      console.error('Error sending message to Firestore:', err);
+    }
 
     // Send to backend
     try {
@@ -107,15 +111,24 @@ const DoctorChatScreen = ({ route, navigation }) => {
       });
 
       // Emit via socket
-      socketRef.current.emit('send_message', {
-        senderId: user.id,
-        receiverId: partnerId,
-        content: textToSend,
-        roomId: roomId
-      });
-    } catch (error) {
-      console.error('Send error:', error);
-      Alert.alert('Error', 'Failed to send message.');
+      if (socketRef.current) {
+        socketRef.current.emit('send_message', {
+          senderId: user.id,
+          receiverId: partnerId,
+          content: textToSend,
+          roomId: userRoomId
+        });
+        if (apptRoomId) {
+          socketRef.current.emit('send_message', {
+            senderId: user.id,
+            receiverId: partnerId,
+            content: textToSend,
+            roomId: apptRoomId
+          });
+        }
+      }
+    } catch (err) {
+      console.error('Error sending message to backend:', err);
     }
   };
 
@@ -132,7 +145,7 @@ const DoctorChatScreen = ({ route, navigation }) => {
       senderName: user.name,
       text: textToSend,
       attachmentUrl: record.fileUrl,
-      attachmentType: record.fileUrl.match(/\.(jpeg|jpg|gif|png)$/) ? 'image' : 'document',
+      attachmentType: record.fileType,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       isMe: true
     };
@@ -143,21 +156,32 @@ const DoctorChatScreen = ({ route, navigation }) => {
         receiverId: partnerId,
         content: textToSend,
         attachmentUrl: record.fileUrl,
-        attachmentType: record.fileUrl.match(/\.(jpeg|jpg|gif|png)$/) ? 'image' : 'document',
+        attachmentType: record.fileType,
         appointmentId: appointment?.id
       });
 
-      socketRef.current.emit('send_message', {
-        senderId: user.id,
-        receiverId: partnerId,
-        content: textToSend,
-        attachmentUrl: record.fileUrl,
-        attachmentType: record.fileUrl.match(/\.(jpeg|jpg|gif|png)$/) ? 'image' : 'document',
-        roomId: roomId
-      });
+      if (socketRef.current) {
+        socketRef.current.emit('send_message', {
+          senderId: user.id,
+          receiverId: partnerId,
+          content: textToSend,
+          attachmentUrl: record.fileUrl,
+          attachmentType: record.fileType,
+          roomId: userRoomId
+        });
+        if (apptRoomId) {
+          socketRef.current.emit('send_message', {
+            senderId: user.id,
+            receiverId: partnerId,
+            content: textToSend,
+            attachmentUrl: record.fileUrl,
+            attachmentType: record.fileType,
+            roomId: apptRoomId
+          });
+        }
+      }
     } catch (error) {
-      console.error('Send attachment error:', error);
-      Alert.alert('Error', 'Failed to send attachment.');
+      console.error('Error sharing report:', error);
     }
   };
 
@@ -172,19 +196,20 @@ const DoctorChatScreen = ({ route, navigation }) => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Avatar uri={doctorAvatar} size={40} online={true} />
+        <Avatar uri={doctorAvatar} name={doctorName} size={40} />
         <View style={styles.headerText}>
           <Text style={styles.docName} numberOfLines={1}>{doctorName}</Text>
           <Text style={styles.docSpecialty}>{doctorSpecialty}</Text>
         </View>
-        <TouchableOpacity style={styles.callIcon}>
-          <Ionicons name="call-outline" size={22} color={colors.textSecondary} />
+        <TouchableOpacity style={styles.callIcon} onPress={() => Alert.alert('Voice Call', 'Calling doctor...')}>
+          <Ionicons name="call" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        enabled={Platform.OS === 'ios'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
         <View style={{ flex: 1 }}>
@@ -217,6 +242,13 @@ const DoctorChatScreen = ({ route, navigation }) => {
             placeholderTextColor={colors.textLight}
             value={inputText}
             onChangeText={setInputText}
+            onSubmitEditing={handleSend}
+            onKeyPress={(e) => {
+              if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
+                e.preventDefault();
+                handleSend();
+              }
+            }}
           />
           <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
             <Ionicons name="send" size={20} color={colors.white} />

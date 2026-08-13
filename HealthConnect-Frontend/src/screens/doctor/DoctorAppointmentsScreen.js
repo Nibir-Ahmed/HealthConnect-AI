@@ -38,14 +38,14 @@ const DoctorAppointmentsScreen = ({ navigation }) => {
 
   const renderItem = ({ item }) => {
     const patientName = item.patient?.name || 'Unknown Patient';
-    const avatar = item.patient?.avatar ? { uri: item.patient.avatar } : require('../../../assets/images/sara.png');
+    const avatar = item.patient?.avatar || require('../../../assets/images/sara.png');
     
     // Inject patientId into patient object for the chat screen
     const chatAppointment = {
       ...item,
       patient: {
-        ...item.patient,
-        id: item.patientId
+        ...(item.patient || {}),
+        id: item.patientId || item.patient?.id
       }
     };
 
@@ -97,6 +97,7 @@ const DoctorAppointmentsScreen = ({ navigation }) => {
         <FlatList
           data={appointments}
           keyExtractor={(item) => item.id.toString()}
+          style={{ flex: 1 }}
           contentContainerStyle={styles.listContainer}
           renderItem={renderItem}
           ListEmptyComponent={

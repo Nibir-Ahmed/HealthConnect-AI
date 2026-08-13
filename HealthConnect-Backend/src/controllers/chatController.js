@@ -4,14 +4,27 @@ const { Op } = require('sequelize');
 
 const getChatHistory = async (req, res) => {
   try {
-    const { partnerId } = req.params;
+    let { partnerId } = req.params;
     const userId = req.user.id;
+
+    // Resolve Doctor ID <-> User ID bi-directionally
+    const Doctor = require('../models/Doctor');
+    let partnerIds = [Number(partnerId)];
+    
+    const doctorObj = await Doctor.findByPk(partnerId);
+    if (doctorObj && doctorObj.userId) {
+      partnerIds.push(Number(doctorObj.userId));
+    }
+    const doctorByUserId = await Doctor.findOne({ where: { userId: partnerId } });
+    if (doctorByUserId) {
+      partnerIds.push(Number(doctorByUserId.id));
+    }
 
     const messages = await Message.findAll({
       where: {
         [Op.or]: [
-          { senderId: userId, receiverId: partnerId },
-          { senderId: partnerId, receiverId: userId }
+          { senderId: userId, receiverId: partnerIds },
+          { senderId: partnerIds, receiverId: userId }
         ]
       },
       order: [['createdAt', 'ASC']]
@@ -26,8 +39,15 @@ const getChatHistory = async (req, res) => {
 
 const sendMessage = async (req, res) => {
   try {
-    const { receiverId, content, attachmentUrl, attachmentType, appointmentId } = req.body;
+    let { receiverId, content, attachmentUrl, attachmentType, appointmentId } = req.body;
     const senderId = req.user.id;
+
+    // Resolve Doctor ID to User ID if needed
+    const Doctor = require('../models/Doctor');
+    const doctorObj = await Doctor.findByPk(receiverId);
+    if (doctorObj && doctorObj.userId) {
+      receiverId = doctorObj.userId;
+    }
 
     const message = await Message.create({
       senderId,

@@ -1,41 +1,62 @@
-import api from './api';
+import { db } from './firebase';
+import { collection, getDocs, doc, getDoc, setDoc, query, where } from 'firebase/firestore';
 
 export const getBlogs = async () => {
   try {
-    const response = await api.get('/blogs');
-    return response.data;
+    const querySnapshot = await getDocs(collection(db, 'blogs'));
+    const blogs = [];
+    querySnapshot.forEach((docSnap) => {
+      blogs.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    return blogs;
   } catch (error) {
-    console.error('Error fetching blogs:', error);
+    console.error('Error fetching blogs from Firestore:', error);
     return [];
   }
 };
 
 export const getSavedBlogs = async () => {
   try {
-    const response = await api.get('/blogs/saved');
-    return response.data;
+    const q = query(collection(db, 'blogs'), where('isSaved', '==', true));
+    const querySnapshot = await getDocs(q);
+    const blogs = [];
+    querySnapshot.forEach((docSnap) => {
+      blogs.push({ id: docSnap.id, ...docSnap.data() });
+    });
+    return blogs;
   } catch (error) {
-    console.error('Error fetching saved blogs:', error);
+    console.error('Error fetching saved blogs from Firestore:', error);
     return [];
   }
 };
 
 export const getBlogById = async (id) => {
   try {
-    const response = await api.get(`/blogs/${id}`);
-    return response.data;
+    const docRef = doc(db, 'blogs', String(id));
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      return { id: docSnap.id, ...docSnap.data() };
+    }
+    return null;
   } catch (error) {
-    console.error('Error fetching blog:', error);
+    console.error('Error fetching blog from Firestore:', error);
     return null;
   }
 };
 
 export const toggleSaveBlog = async (id) => {
   try {
-    const response = await api.post(`/blogs/${id}/save`);
-    return response.data; // should return { saved: true/false }
+    const docRef = doc(db, 'blogs', String(id));
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      const currentStatus = docSnap.data().isSaved || false;
+      await setDoc(docRef, { isSaved: !currentStatus }, { merge: true });
+      return { saved: !currentStatus };
+    }
+    return { saved: false };
   } catch (error) {
-    console.error('Error saving blog:', error);
+    console.error('Error saving blog in Firestore:', error);
     return { saved: false };
   }
 };
+

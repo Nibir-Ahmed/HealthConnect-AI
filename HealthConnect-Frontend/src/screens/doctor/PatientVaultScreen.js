@@ -45,7 +45,8 @@ const PatientVaultScreen = ({ navigation, route }) => {
       return;
     }
     const backendUrl = api.defaults.baseURL.replace('/api', '');
-    Linking.openURL(`${backendUrl}${fileUrl}`).catch(() => {
+    const fullUrl = fileUrl.startsWith('http') ? fileUrl : `${backendUrl}${fileUrl}`;
+    Linking.openURL(fullUrl).catch(() => {
       Alert.alert('Error', 'Could not open this file.');
     });
   };

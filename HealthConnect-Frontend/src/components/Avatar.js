@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Image, StyleSheet } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Image, StyleSheet, Platform } from 'react-native';
 import colors from '../utils/colors';
 
 const DEFAULT_AVATAR = require('../../assets/images/sara.png');
@@ -18,26 +18,55 @@ const getLocalAvatar = (uri) => {
   return uri;
 };
 
-const Avatar = ({ uri, size = 48, online }) => {
+const Avatar = ({ uri, name, size = 48, online }) => {
+  const [imgError, setImgError] = useState(false);
+
+  useEffect(() => {
+    setImgError(false);
+  }, [uri]);
+
   const dotSize = Math.max(12, size * 0.25);
   const borderSize = Math.max(2, dotSize * 0.2);
 
   let finalSource = DEFAULT_AVATAR;
-  if (uri) {
+  if (name) {
+    finalSource = { uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00A896&color=fff` };
+  }
+
+  if (uri && !imgError) {
     if (typeof uri === 'number' || typeof uri === 'object') {
       finalSource = uri;
-    } else if (typeof uri === 'string') {
+    } else if (typeof uri === 'string' && uri.trim().length > 0) {
       const mapped = getLocalAvatar(uri);
-      finalSource = mapped === uri ? { uri } : mapped;
+      if (mapped !== uri) {
+        finalSource = mapped;
+      } else {
+        let remoteUri = uri;
+        if (Platform.OS === 'android' && uri.startsWith('http') && !uri.includes('googleusercontent.com') && !uri.match(/\.(jpeg|jpg|gif|png)$/i)) {
+          remoteUri = uri + '#.png';
+        }
+        finalSource = { uri: remoteUri };
+      }
     }
   }
 
   return (
     <View style={[styles.container, { width: size, height: size }]}>
-      <Image
-        source={finalSource}
-        style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
-      />
+      {Platform.OS === 'web' && typeof finalSource === 'object' && finalSource.uri ? (
+        <img 
+          src={finalSource.uri} 
+          style={{ width: size, height: size, borderRadius: size / 2, objectFit: 'cover', backgroundColor: colors.background }}
+          referrerPolicy="no-referrer"
+          onError={() => setImgError(true)}
+          alt="Avatar"
+        />
+      ) : (
+        <Image
+          source={finalSource}
+          style={[styles.image, { width: size, height: size, borderRadius: size / 2 }]}
+          onError={() => setImgError(true)}
+        />
+      )}
       {online !== undefined && (
         <View style={[
           styles.statusDot,

@@ -86,6 +86,7 @@ const DoctorVerificationScreen = ({ navigation }) => {
         <FlatList
           data={pendingList}
           keyExtractor={(item) => item.id.toString()}
+          style={{ flex: 1 }}
           contentContainerStyle={styles.listContainer}
           renderItem={({ item }) => (
             <Card style={styles.docCard}>

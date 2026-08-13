@@ -190,8 +190,7 @@ const MedicalCardScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    overflow: 'hidden'
+    backgroundColor: colors.background
   },
   header: {
     flexDirection: 'row',

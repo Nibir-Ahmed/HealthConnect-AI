@@ -53,6 +53,54 @@ const getBlogs = async (req, res) => {
   }
 };
 
+const getMyBlogs = async (req, res) => {
+  try {
+    const blogs = await Blog.findAll({
+      where: { authorId: req.user.id },
+      include: [
+        {
+          model: User,
+          as: 'author',
+          attributes: ['name', 'avatar', 'role']
+        },
+        {
+          model: BlogInteraction
+        }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+
+    const formattedBlogs = blogs.map(blog => {
+      const b = blog.toJSON();
+      let likes = 0;
+      let isLiked = false;
+      let isSaved = false;
+
+      if (b.BlogInteractions) {
+        likes = b.BlogInteractions.filter(i => i.isLiked).length;
+        const myInteraction = b.BlogInteractions.find(i => i.userId === req.user.id);
+        if (myInteraction) {
+          isLiked = myInteraction.isLiked;
+          isSaved = myInteraction.isSaved;
+        }
+      }
+
+      delete b.BlogInteractions;
+      return {
+        ...b,
+        likes,
+        isLiked,
+        isSaved
+      };
+    });
+
+    res.json(formattedBlogs);
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error fetching doctor blogs' });
+  }
+};
+
 const getSavedBlogs = async (req, res) => {
   try {
     const userId = req.user.id;
@@ -106,11 +154,13 @@ const getSavedBlogs = async (req, res) => {
 
 const createBlog = async (req, res) => {
   try {
-    const { title, content, tags } = req.body;
+    const { title, content, tags, coverImage: bodyCoverImage } = req.body;
     let coverImage = null;
 
     if (req.file) {
       coverImage = `${req.protocol}://${req.get('host')}/uploads/blogs/${req.file.filename}`;
+    } else if (bodyCoverImage) {
+      coverImage = bodyCoverImage;
     }
     
     // Parse tags if it comes as a string (FormData sends arrays differently)
@@ -189,10 +239,27 @@ const toggleLikeBlog = async (req, res) => {
   }
 };
 
+const deleteBlog = async (req, res) => {
+  try {
+    const blogId = req.params.id || req.params.blogId;
+    const blog = await Blog.findByPk(blogId);
+    if (!blog) {
+      return res.status(404).json({ message: 'Blog post not found' });
+    }
+    await blog.destroy();
+    res.json({ message: 'Blog post deleted successfully' });
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: 'Server error deleting blog' });
+  }
+};
+
 module.exports = {
   getBlogs,
+  getMyBlogs,
   createBlog,
   toggleSaveBlog,
   toggleLikeBlog,
-  getSavedBlogs
+  getSavedBlogs,
+  deleteBlog
 };

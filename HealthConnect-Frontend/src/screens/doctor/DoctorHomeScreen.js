@@ -152,6 +152,23 @@ const DoctorHomeScreen = ({ navigation }) => {
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.actionCard}
+          activeOpacity={0.8}
+          onPress={() => navigation.navigate('BlogFeed', { filter: 'my' })}
+        >
+          <View style={styles.actionLeft}>
+            <View style={[styles.actionIconContainer, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
+              <Ionicons name="document-text-outline" size={22} color="#3B82F6" />
+            </View>
+            <View style={styles.actionTextContainer}>
+              <Text style={styles.actionTitle}>Published Health Articles</Text>
+              <Text style={styles.actionSubtitle}>View and manage all your posted blogs</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={20} color={colors.textSecondary} />
+        </TouchableOpacity>
       </ScrollView>
       </View>
     </SafeAreaView>

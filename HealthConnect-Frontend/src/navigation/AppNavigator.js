@@ -16,6 +16,7 @@ import DoctorChatScreen from '../screens/patient/DoctorChatScreen';
 import MedicalCardScreen from '../screens/patient/MedicalCardScreen';
 import BMICalculatorScreen from '../screens/patient/BMICalculatorScreen';
 import SavedBlogsScreen from '../screens/patient/SavedBlogsScreen';
+import BlogFeedScreen from '../screens/patient/BlogFeedScreen';
 import BlogDetailScreen from '../screens/patient/BlogDetailScreen';
 import MedicineReminderScreen from '../screens/patient/MedicineReminderScreen';
 import HealthRecordsScreen from '../screens/patient/HealthRecordsScreen';
@@ -36,6 +37,8 @@ import ConsultationSettingsScreen from '../screens/doctor/ConsultationSettingsSc
 import BlogEditorScreen from '../screens/admin/BlogEditorScreen';
 import PatientDirectoryScreen from '../screens/admin/PatientDirectoryScreen';
 import DoctorVerificationScreen from '../screens/admin/DoctorVerificationScreen';
+
+import { Platform } from 'react-native';
 
 const Stack = createStackNavigator();
 
@@ -60,7 +63,7 @@ const AppNavigator = () => {
   };
 
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animationEnabled: Platform.OS !== 'web' }}>
       {/* Root Tab Screen */}
       <Stack.Screen name="MainTabs" component={getRootComponent()} />
 
@@ -73,6 +76,7 @@ const AppNavigator = () => {
       <Stack.Screen name="EditProfile" component={EditProfileScreen} options={{ headerShown: false }} />
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <Stack.Screen name="BMICalculator" component={BMICalculatorScreen} />
+      <Stack.Screen name="BlogFeed" component={BlogFeedScreen} />
       <Stack.Screen name="SavedBlogs" component={SavedBlogsScreen} />
       <Stack.Screen name="BlogDetail" component={BlogDetailScreen} />
       <Stack.Screen name="MedicineReminder" component={MedicineReminderScreen} />

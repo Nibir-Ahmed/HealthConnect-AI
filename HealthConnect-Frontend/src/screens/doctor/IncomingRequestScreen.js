@@ -13,8 +13,8 @@ const IncomingRequestScreen = ({ route, navigation }) => {
 
   const handleAccept = async () => {
     try {
-      await api.put(`/appointments/${request.id}`, { status: 'confirmed' });
-      navigation.replace('PatientChat', { appointment: request });
+      await api.put(`/appointments/${request.id}/status`, { status: 'confirmed' });
+      navigation.replace('PatientChat', { appointment: { ...request, status: 'confirmed' } });
     } catch (error) {
       console.error('Error accepting request', error);
     }
@@ -22,7 +22,7 @@ const IncomingRequestScreen = ({ route, navigation }) => {
 
   const handleDecline = async () => {
     try {
-      await api.put(`/appointments/${request.id}`, { status: 'cancelled' });
+      await api.put(`/appointments/${request.id}/status`, { status: 'cancelled' });
       navigation.goBack();
     } catch (error) {
       console.error('Error declining request', error);

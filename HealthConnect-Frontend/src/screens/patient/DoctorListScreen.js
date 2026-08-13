@@ -1,5 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, FlatList, TextInput, ScrollView, TouchableOpacity, ActivityIndicator, useWindowDimensions, Platform } from 'react-native';
+import { io } from 'socket.io-client';
+
+import { SERVER_URL as BACKEND_URL } from '../../utils/config';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { getDoctors } from '../../services/doctorsApi';
@@ -14,9 +17,23 @@ const DoctorListScreen = ({ navigation }) => {
   const [doctors, setDoctors] = useState([]);
   const [loading, setLoading] = useState(true);
   const { height: windowHeight } = useWindowDimensions();
+  const socketRef = useRef(null);
 
   useEffect(() => {
     fetchDoctors();
+
+    socketRef.current = io(BACKEND_URL);
+    socketRef.current.on('user_status_change', (data) => {
+      setDoctors(prevDoctors => 
+        prevDoctors.map(doc => 
+          doc.userId === data.userId ? { ...doc, isOnline: data.isOnline } : doc
+        )
+      );
+    });
+
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
+    };
   }, []);
 
   const fetchDoctors = async () => {
@@ -24,13 +41,14 @@ const DoctorListScreen = ({ navigation }) => {
       const data = await getDoctors();
       const formattedDoctors = data.map(doc => ({
         id: doc.id.toString(),
+        userId: doc.userId || doc.User?.id,
         name: doc.User?.name || 'Unknown',
         specialty: doc.specialty,
         avatar: doc.User?.avatar || 'https://via.placeholder.com/150',
         rating: doc.rating,
         reviews: 0, // Mock for now if not in DB
         experience: doc.experience || 0,
-        isOnline: doc.User?.isOnline || false,
+        isOnline: doc.User?.isOnline === true,
         bio: doc.bio,
         consultationFee: doc.consultationFee
       }));
@@ -46,6 +64,9 @@ const DoctorListScreen = ({ navigation }) => {
     const matchesSearch = doc.name.toLowerCase().includes(search.toLowerCase()) || doc.specialty.toLowerCase().includes(search.toLowerCase());
     const matchesSpecialty = selectedSpecialty === 'All' || doc.specialty === selectedSpecialty;
     return matchesSearch && matchesSpecialty;
+  }).sort((a, b) => {
+    if (a.isOnline === b.isOnline) return 0;
+    return a.isOnline ? -1 : 1;
   });
 
   return (

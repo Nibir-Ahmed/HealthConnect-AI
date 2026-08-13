@@ -110,10 +110,11 @@ const SetAvailabilityScreen = ({ navigation }) => {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        enabled={Platform.OS === 'ios'}
       >
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { flexGrow: 1 }]}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={[styles.content, { flexGrow: 1 }]} keyboardShouldPersistTaps="handled">
           <Text style={styles.description}>
             Set your working days and consultation hours. These slots will be visible to patients booking an appointment.
           </Text>

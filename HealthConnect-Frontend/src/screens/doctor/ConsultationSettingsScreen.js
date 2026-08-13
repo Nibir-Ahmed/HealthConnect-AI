@@ -49,9 +49,9 @@ const ConsultationSettingsScreen = ({ navigation }) => {
         specialty,
         university,
         licenseNumber,
-        experience: parseInt(experience, 10),
+        experience: parseInt(experience, 10) || 0,
         bio,
-        consultationFee: parseFloat(consultationFee)
+        consultationFee: parseFloat(consultationFee) || 0
       });
       
       Alert.alert('Success', 'Profile settings updated successfully!', [
@@ -82,7 +82,7 @@ const ConsultationSettingsScreen = ({ navigation }) => {
         <View style={{ width: 24 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.description}>
           Update your public profile, professional credentials, and consultation fee below.
         </Text>

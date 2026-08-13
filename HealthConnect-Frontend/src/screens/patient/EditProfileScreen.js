@@ -74,10 +74,11 @@ const EditProfileScreen = ({ navigation }) => {
         <View style={{ width: 40 }} />
       </View>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        enabled={Platform.OS === 'ios'}
       >
-        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={true}>
+        <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={true} keyboardShouldPersistTaps="handled">
         <View style={styles.avatarSection}>
           <Avatar uri={avatar || 'https://ui-avatars.com/api/?name=User'} size={100} />
           <TouchableOpacity style={styles.editAvatarBtn} onPress={() => {
@@ -174,8 +175,7 @@ const EditProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
-    overflow: 'hidden'
+    backgroundColor: colors.background
   },
   header: {
     flexDirection: 'row',

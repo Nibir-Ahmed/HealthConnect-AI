@@ -7,11 +7,13 @@ import RegisterScreen from '../screens/common/RegisterScreen';
 import RoleSelectionScreen from '../screens/common/RoleSelectionScreen';
 import ForgotPasswordScreen from '../screens/common/ForgotPasswordScreen';
 
+import { Platform } from 'react-native';
+
 const Stack = createStackNavigator();
 
 const AuthNavigator = () => {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, animationEnabled: Platform.OS !== 'web' }}>
       <Stack.Screen name="Splash" component={SplashScreen} />
       <Stack.Screen name="Onboarding" component={OnboardingScreen} />
       <Stack.Screen name="RoleSelection" component={RoleSelectionScreen} />

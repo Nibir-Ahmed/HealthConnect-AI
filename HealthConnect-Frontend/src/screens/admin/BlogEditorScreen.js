@@ -46,23 +46,43 @@ const BlogEditorScreen = ({ navigation }) => {
         const filename = image.name || 'image.jpg';
         const type = image.mimeType || 'image/jpeg';
         
+        let imageAppended = false;
         if (Platform.OS === 'web') {
-          const res = await fetch(image.uri);
-          const blob = await res.blob();
-          formData.append('image', blob, filename);
+          if (image.file) {
+            formData.append('image', image.file, filename);
+            imageAppended = true;
+          } else if (image.uri) {
+            try {
+              const res = await fetch(image.uri);
+              const blob = await res.blob();
+              formData.append('image', blob, filename);
+              imageAppended = true;
+            } catch (e) {
+              console.log('Blob fetch fallback:', e);
+            }
+          }
         } else {
           formData.append('image', {
             uri: image.uri,
             name: filename,
             type: type,
           });
+          imageAppended = true;
         }
 
-        const headers = Platform.OS === 'web' 
-          ? {} 
-          : { 'Content-Type': 'multipart/form-data' };
-
-        await api.post('/blogs', formData, { headers });
+        if (imageAppended) {
+          const headers = Platform.OS === 'web' 
+            ? {} 
+            : { 'Content-Type': 'multipart/form-data' };
+          await api.post('/blogs', formData, { headers });
+        } else {
+          await api.post('/blogs', {
+            title,
+            content: body,
+            tags: [category, readTime],
+            coverImage: image.uri && (image.uri.startsWith('data:') || image.uri.startsWith('http')) ? image.uri : null
+          });
+        }
       } else {
         // Send as JSON if no image is selected
         await api.post('/blogs', {
@@ -81,11 +101,12 @@ const BlogEditorScreen = ({ navigation }) => {
         ]);
       }
     } catch (error) {
-      console.error('Error creating blog:', error);
+      console.error('Error creating blog:', error.response?.data || error.message);
+      const errMsg = error.response?.data?.message || 'Failed to publish article.';
       if (Platform.OS === 'web') {
-        window.alert('Failed to publish article.');
+        window.alert(errMsg);
       } else {
-        Alert.alert('Error', 'Failed to publish article.');
+        Alert.alert('Error', errMsg);
       }
     } finally {
       setLoading(false);
@@ -133,15 +154,16 @@ const BlogEditorScreen = ({ navigation }) => {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        enabled={Platform.OS === 'ios'}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
         <View style={styles.formSection}>
           <Text style={styles.inputLabel}>Cover Image</Text>
           <TouchableOpacity style={styles.imagePicker} onPress={pickImage}>
             {image ? (
-              <Image source={{ uri: image.uri }} style={styles.previewImage} />
+              <Image source={{ uri: image.uri }} style={styles.previewImage} resizeMode="cover" />
             ) : (
               <View style={styles.placeholderContainer}>
                 <Ionicons name="image-outline" size={32} color={colors.textLight} />
@@ -264,8 +286,7 @@ const styles = StyleSheet.create({
   },
   previewImage: {
     width: '100%',
-    height: '100%',
-    resizeMode: 'cover'
+    height: '100%'
   },
   publishBtn: {
     marginTop: 8

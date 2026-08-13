@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useContext } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Linking, useWindowDimensions, Modal, FlatList } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Linking, useWindowDimensions, Modal, FlatList, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as DocumentPicker from 'expo-document-picker';
@@ -58,11 +58,19 @@ const HealthRecordsScreen = ({ navigation }) => {
 
       // Prepare form data
       const formData = new FormData();
-      formData.append('file', {
-        uri: file.uri,
-        name: file.name,
-        type: file.mimeType || 'application/octet-stream',
-      });
+      if (Platform.OS === 'web' && file.file) {
+        formData.append('file', file.file);
+      } else if (Platform.OS === 'web') {
+        const res = await fetch(file.uri);
+        const blob = await res.blob();
+        formData.append('file', blob, file.name);
+      } else {
+        formData.append('file', {
+          uri: file.uri,
+          name: file.name,
+          type: file.mimeType || 'application/octet-stream',
+        });
+      }
       formData.append('title', file.name);
       formData.append('type', file.mimeType?.includes('pdf') ? 'general' : 'xray');
 

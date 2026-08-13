@@ -5,13 +5,42 @@ import { Ionicons } from '@expo/vector-icons';
 import Badge from '../../components/Badge';
 import colors from '../../utils/colors';
 import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+
 const BlogDetailScreen = ({ route, navigation }) => {
   const { width, height: windowHeight } = useWindowDimensions();
+  const { user } = useAuth();
   const isLargeScreen = width > 768;
   const { blog } = route.params;
   const [isLiked, setIsLiked] = useState(blog.isLiked || false);
   const [isSaved, setIsSaved] = useState(blog.isSaved || false);
   const [likesCount, setLikesCount] = useState(blog.likes || 0);
+
+  const handleDelete = () => {
+    const confirmMsg = 'Are you sure you want to delete this health article?';
+    if (Platform.OS === 'web') {
+      if (window.confirm(confirmMsg)) executeDelete();
+    } else {
+      Alert.alert('Delete Article', confirmMsg, [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Delete', style: 'destructive', onPress: executeDelete }
+      ]);
+    }
+  };
+
+  const executeDelete = async () => {
+    try {
+      await api.delete(`/blogs/${blog.id}`);
+      if (Platform.OS === 'web') window.alert('Article deleted successfully.');
+      else Alert.alert('Success', 'Article deleted successfully.');
+      navigation.goBack();
+    } catch (error) {
+      console.error('Error deleting blog:', error);
+      if (Platform.OS === 'web') window.alert('Failed to delete article.');
+      else Alert.alert('Error', 'Failed to delete article.');
+    }
+  };
+
   const getImageUrl = (url) => {
     if (!url) return null;
     if (url.startsWith('http')) return { uri: url };
@@ -75,9 +104,16 @@ const BlogDetailScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle} numberOfLines={1}>Article</Text>
-        <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
-          <Ionicons name="share-social-outline" size={22} color={colors.textPrimary} />
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          {(user?.role === 'admin' || user?.role === 'doctor') && (
+            <TouchableOpacity onPress={handleDelete}>
+              <Ionicons name="trash-outline" size={22} color={colors.emergency} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+            <Ionicons name="share-social-outline" size={22} color={colors.textPrimary} />
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={{ flex: 1 }}>
         <ScrollView 

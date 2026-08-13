@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import api from '../../services/api';
 import AppointmentCard from '../../components/AppointmentCard';
@@ -24,7 +24,8 @@ const MyAppointmentsScreen = ({ navigation }) => {
           userId: appt.doctor?.userId,
           name: appt.doctor?.User?.name || 'Unknown Doctor',
           specialty: appt.doctor?.specialty || 'General',
-          avatar: appt.doctor?.User?.avatar || 'https://via.placeholder.com/150'
+          avatar: appt.doctor?.User?.avatar || 'https://via.placeholder.com/150',
+          isOnline: appt.doctor?.User?.isOnline !== false
         },
         date: appt.date,
         time: appt.time,
@@ -35,6 +36,38 @@ const MyAppointmentsScreen = ({ navigation }) => {
       console.error('Error fetching appointments:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancel = (appointmentId) => {
+    const executeCancel = async () => {
+      try {
+        await api.put(`/appointments/${appointmentId}/status`, { status: 'cancelled' });
+        if (Platform.OS === 'web') {
+          alert('Appointment cancelled successfully.');
+        } else {
+          Alert.alert('Success', 'Appointment cancelled successfully.');
+        }
+        fetchAppointments();
+      } catch (err) {
+        console.error('Error cancelling appointment:', err);
+        Alert.alert('Error', 'Failed to cancel appointment. Please try again.');
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      if (window.confirm('Are you sure you want to cancel this appointment?')) {
+        executeCancel();
+      }
+    } else {
+      Alert.alert(
+        'Cancel Appointment',
+        'Are you sure you want to cancel this appointment?',
+        [
+          { text: 'No', style: 'cancel' },
+          { text: 'Yes, Cancel', style: 'destructive', onPress: executeCancel }
+        ]
+      );
     }
   };
 
@@ -77,14 +110,16 @@ const MyAppointmentsScreen = ({ navigation }) => {
         <FlatList
           data={filteredAppointments}
           keyExtractor={(item) => item.id}
+          style={{ flex: 1 }}
           renderItem={({ item }) => (
             <AppointmentCard
               appointment={item}
               onPress={() => {
-                if (item.status === 'pending' || item.status === 'confirmed') {
+                if (item.status === 'pending' || item.status === 'confirmed' || item.status === 'upcoming') {
                   navigation.navigate('DoctorChat', { appointment: item });
                 }
               }}
+              onCancel={handleCancel}
             />
           )}
           contentContainerStyle={styles.listContainer}

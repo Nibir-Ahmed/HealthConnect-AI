@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet,  ScrollView, Alert, useWindowDimensions, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert, useWindowDimensions, KeyboardAvoidingView, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Input from '../../components/Input';
@@ -22,52 +22,59 @@ const PrescriptionScreen = ({ route, navigation }) => {
 
   const [loading, setLoading] = useState(false);
 
+  const issuePrescription = async () => {
+    try {
+      setLoading(true);
+      const medications = [{
+        name: medName,
+        dosage: dosage,
+        frequency: freq,
+        duration: duration
+      }];
+
+      await api.post('/prescriptions', {
+        patientId,
+        appointmentId,
+        medications: JSON.stringify(medications),
+        notes: advice
+      });
+
+      if (Platform.OS === 'web') {
+        alert(`Success: Prescription has been sent to ${patientName} and logged in their health vault.`);
+        navigation.goBack();
+      } else {
+        Alert.alert('Success', 'Prescription has been sent to the patient and logged in their health vault.', [
+          { text: 'OK', onPress: () => navigation.goBack() }
+        ]);
+      }
+    } catch (error) {
+      console.error('Error issuing prescription:', error);
+      Alert.alert('Error', 'Failed to issue prescription.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async () => {
     if (!medName || !dosage || !freq || !duration) {
       Alert.alert('Form Error', 'Please complete all medicine details before issuing.');
       return;
     }
 
-    Alert.alert(
-      'Issue Prescription',
-      `Are you sure you want to send this prescription to ${patientName}?`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Send',
-          onPress: async () => {
-            try {
-              setLoading(true);
-              const appointmentId = route.params?.appointmentId;
-              const patientId = route.params?.patientId;
-
-              const medications = [{
-                name: medName,
-                dosage: dosage,
-                frequency: freq,
-                duration: duration
-              }];
-
-              await api.post('/prescriptions', {
-                patientId,
-                appointmentId,
-                medications: JSON.stringify(medications),
-                notes: advice
-              });
-
-              Alert.alert('Success', 'Prescription has been sent to the patient and logged in their health vault.', [
-                { text: 'OK', onPress: () => navigation.goBack() }
-              ]);
-            } catch (error) {
-              console.error('Error issuing prescription:', error);
-              Alert.alert('Error', 'Failed to issue prescription.');
-            } finally {
-              setLoading(false);
-            }
-          }
-        }
-      ]
-    );
+    if (Platform.OS === 'web') {
+      if (window.confirm(`Are you sure you want to send this prescription to ${patientName}?`)) {
+        issuePrescription();
+      }
+    } else {
+      Alert.alert(
+        'Issue Prescription',
+        `Are you sure you want to send this prescription to ${patientName}?`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Send', onPress: issuePrescription }
+        ]
+      );
+    }
   };
 
   return (
@@ -81,8 +88,9 @@ const PrescriptionScreen = ({ route, navigation }) => {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
+        enabled={Platform.OS === 'ios'}
       >
         <ScrollView contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled" style={{ flex: 1 }}>
         {/* Patient card */}
