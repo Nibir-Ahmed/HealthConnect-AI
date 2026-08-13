@@ -13,7 +13,7 @@ const getHostIp = () => {
   return '192.168.1.100'; // Wi-Fi LAN IP fallback
 };
 
-export const SERVER_URL = `http://${getHostIp()}:5001`;
+export const SERVER_URL = 'https://healthconnect-ai-eqcg.onrender.com';
 export const API_BASE_URL = `${SERVER_URL}/api`;
 
 export default {
