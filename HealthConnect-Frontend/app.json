@@ -10,6 +10,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.healthconnect.app",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -21,7 +22,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-sharing"
-    ]
+      "expo-sharing",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "64a0ca27-d7b1-4371-b981-f36ffa50052a"
+      }
+    },
+    "owner": "ahmednibir"
   }
 }
