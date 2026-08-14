@@ -1,11 +1,14 @@
 import React from 'react';
-import { View, Text, Switch, StyleSheet } from 'react-native';
+import { View, Text, Switch, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../utils/colors';
+
 const PILL_COLORS = [colors.primary, colors.emergency, colors.info, colors.warning, colors.success];
-const MedicineCard = ({ medicine, onToggle }) => {
+
+const MedicineCard = ({ medicine, onToggle, onDelete }) => {
   const { name, dosage, frequency, time, isActive, colorIndex = 0 } = medicine;
   const pillColor = PILL_COLORS[colorIndex % PILL_COLORS.length];
+
   return (
     <View style={styles.card}>
       <View style={[styles.iconCircle, { backgroundColor: pillColor + '18' }]}>
@@ -26,6 +29,11 @@ const MedicineCard = ({ medicine, onToggle }) => {
         thumbColor={isActive ? colors.primary : colors.textLight}
         ios_backgroundColor={colors.border}
       />
+      {onDelete && (
+        <TouchableOpacity style={styles.deleteBtn} onPress={onDelete}>
+          <Ionicons name="trash-outline" size={18} color={colors.emergency} />
+        </TouchableOpacity>
+      )}
     </View>
   );
 };
@@ -70,6 +78,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textLight,
     marginLeft: 4
+  },
+  deleteBtn: {
+    padding: 8,
+    marginLeft: 6
   }
 });
 export default MedicineCard;

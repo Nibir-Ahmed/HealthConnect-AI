@@ -93,8 +93,60 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const googleLogin = async () => {
-    return { success: true };
+  const googleLogin = async (googleUserData) => {
+    try {
+      const { uid, email, name, avatar, role } = googleUserData;
+      const userRef = doc(db, 'users', uid);
+      const userSnap = await getDoc(userRef);
+      
+      let profileData = {
+        name: name || 'Google User',
+        email: email,
+        avatar: avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'User')}&background=00A896&color=fff&bold=true`,
+        role: role || 'patient',
+        lastLogin: new Date().toISOString()
+      };
+
+      if (!userSnap.exists()) {
+        profileData.createdAt = new Date().toISOString();
+        await setDoc(userRef, profileData);
+      } else {
+        const existingData = userSnap.data();
+        profileData = { ...existingData, ...profileData, role: existingData.role || role || 'patient' };
+        await setDoc(userRef, profileData, { merge: true });
+      }
+
+      // If user is a doctor, ensure doctor document exists in 'doctors' collection
+      if (profileData.role === 'doctor') {
+        const docRef = doc(db, 'doctors', uid);
+        const docSnap = await getDoc(docRef);
+        if (!docSnap.exists()) {
+          await setDoc(docRef, {
+            id: uid,
+            userId: uid,
+            name: name ? (name.startsWith('Dr.') ? name : `Dr. ${name}`) : 'Dr. Specialist',
+            email: email,
+            specialty: 'General Physician',
+            avatar: avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(name || 'Doctor')}&background=00A896&color=fff&bold=true`,
+            experience: 5,
+            rating: 5.0,
+            reviews: 0,
+            consultationFee: 40,
+            bio: 'Verified medical practitioner on HealthConnect.',
+            isVerified: true,
+            isOnline: true,
+            availability: ['09:00 AM', '11:00 AM', '02:00 PM', '04:00 PM'],
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+
+      setUser({ id: uid, uid, ...profileData });
+      return { success: true };
+    } catch (error) {
+      console.error('Google login sync error:', error);
+      return { success: false, message: error.message };
+    }
   };
 
   const updateUser = async (updatedData) => {

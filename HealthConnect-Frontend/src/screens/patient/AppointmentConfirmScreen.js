@@ -1,12 +1,18 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ActivityIndicator, Alert, TouchableOpacity } from 'react-native';;
 import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import Avatar from '../../components/Avatar';
 import colors from '../../utils/colors';
 import api from '../../services/api';
+import { db } from '../../services/firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import { useAuth } from '../../context/AuthContext';
+
 const AppointmentConfirmScreen = ({ route, navigation }) => {
+  const { user } = useAuth();
   const { doctor, date, time } = route.params;
   const [loading, setLoading] = useState(false);
   const [isConfirmed, setIsConfirmed] = useState(false);
@@ -17,29 +23,35 @@ const AppointmentConfirmScreen = ({ route, navigation }) => {
     try {
       setLoading(true);
       
-      // We convert 02:00 PM to HH:mm for the backend
-      const [timeStr, modifier] = time.split(' ');
-      let [hours, minutes] = timeStr.split(':');
-      if (hours === '12') {
-        hours = '00';
-      }
-      if (modifier === 'PM') {
-        hours = parseInt(hours, 10) + 12;
-      }
-      const timeFormatted = `${hours}:${minutes}:00`;
-      
-      await api.post('/appointments', {
-        doctorId: doctor.id,
-        date: dateObj.toISOString().split('T')[0], // YYYY-MM-DD
-        time: timeFormatted,
+      const apptData = {
+        patientId: user?.id || user?.uid || 'patient_user',
+        patient: {
+          id: user?.id || user?.uid || 'patient_user',
+          name: user?.name || 'Patient',
+          email: user?.email || '',
+          avatar: user?.avatar || ''
+        },
+        doctorId: doctor.id ? String(doctor.id) : 'doc_cardiology_1',
+        doctor: {
+          id: doctor.id ? String(doctor.id) : 'doc_cardiology_1',
+          name: doctor.name || 'Doctor',
+          specialty: doctor.specialty || 'General Practitioner',
+          avatar: doctor.avatar || '',
+          university: doctor.university || ''
+        },
+        date: dateObj.toISOString().split('T')[0],
+        time: time,
         type: 'chat',
-        reason: 'General Consultation'
-      });
-      
+        reason: 'General Consultation',
+        status: 'upcoming',
+        createdAt: new Date().toISOString()
+      };
+
+      await addDoc(collection(db, 'appointments'), apptData);
       setIsConfirmed(true);
     } catch (error) {
-      console.error('Booking error:', error);
-      Alert.alert('Booking Failed', 'There was a problem booking your appointment. Please try again.');
+      console.error('Booking error in Firestore:', error);
+      Alert.alert('Booking Failed', error.message || 'There was a problem booking your appointment. Please try again.');
     } finally {
       setLoading(false);
     }

@@ -1,14 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet,  ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../../components/Avatar';
 import ChatBubble from '../../components/ChatBubble';
 import colors from '../../utils/colors';
-import api from '../../services/api';
-import { io } from 'socket.io-client';
 import { useAuth } from '../../context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { db } from '../../services/firebase';
+import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
+
+const getRoomId = (id1, id2) => {
+  const s1 = String(id1 || '');
+  const s2 = String(id2 || '');
+  return s1 < s2 ? `chat_${s1}_${s2}` : `chat_${s2}_${s1}`;
+};
 
 const PatientChatScreen = ({ route, navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
@@ -18,137 +23,68 @@ const PatientChatScreen = ({ route, navigation }) => {
   const patient = appointment?.patient || route.params?.patient;
   const patientName = patient?.name || patient?.User?.name || 'Patient';
   const patientAvatar = patient?.avatar || patient?.User?.avatar;
-  const partnerId = patient?.id || patient?.userId;
+  const patientId = String(patient?.id || patient?.userId || 'patient_user');
+  const myId = String(user?.uid || user?.id || 'doc_cardiology_1');
   
-  const userRoomId = `chat_${Math.min(user?.id || 0, partnerId || 0)}_${Math.max(user?.id || 0, partnerId || 0)}`;
-  const apptRoomId = appointment?.id ? `appt_${appointment.id}` : null;
+  const roomId = getRoomId(myId, patientId);
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const scrollViewRef = useRef();
-  const socketRef = useRef(null);
-
-  const updateMessages = (updater) => {
-    setMessages((prev) => {
-      const updated = typeof updater === 'function' ? updater(prev) : [...prev, updater];
-      if (partnerId && user?.id) {
-        const cacheKey = `chat_cache_${user.id}_${partnerId}`;
-        AsyncStorage.setItem(cacheKey, JSON.stringify(updated)).catch(() => {});
-      }
-      return updated;
-    });
-  };
 
   useEffect(() => {
-    const cacheKey = `chat_cache_${user?.id}_${partnerId}`;
+    // Real-time Firestore Chat Listener
+    const messagesRef = collection(db, 'messages');
+    const q = query(messagesRef, where('roomId', '==', roomId));
 
-    const loadCachedMessages = async () => {
-      if (!partnerId || !user?.id) return;
-      try {
-        const cached = await AsyncStorage.getItem(cacheKey);
-        if (cached) {
-          setMessages(JSON.parse(cached));
-        }
-      } catch (e) {}
-    };
-    loadCachedMessages();
-
-    const fetchHistory = async () => {
-      if (!partnerId) return;
-      try {
-        const response = await api.get(`/chat/${partnerId}`);
-        const formatted = response.data.map(msg => {
-          const isMe = Number(msg.senderId) === Number(user?.id);
-          return {
-            id: msg.id.toString(),
-            senderId: msg.senderId.toString(),
-            senderName: isMe ? `Dr. ${user?.name}` : patientName,
-            text: msg.content,
-            attachmentUrl: msg.attachmentUrl,
-            attachmentType: msg.attachmentType,
-            timestamp: new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-            isMe: isMe
-          };
-        });
-        setMessages(formatted);
-        AsyncStorage.setItem(cacheKey, JSON.stringify(formatted)).catch(() => {});
-      } catch (error) {
-        console.error('Error fetching chat history:', error);
-      }
-    };
-    fetchHistory();
-
-    const BACKEND_URL = api.defaults.baseURL.replace('/api', '');
-    socketRef.current = io(BACKEND_URL);
-
-    socketRef.current.on('connect', () => {
-      socketRef.current.emit('join_room', userRoomId);
-      if (apptRoomId) socketRef.current.emit('join_room', apptRoomId);
-    });
-
-    socketRef.current.on('receive_message', (data) => {
-      if (Number(data.senderId) !== Number(user?.id)) {
-        const newMsg = {
-          id: Math.random().toString(),
-          senderId: data.senderId.toString(),
-          senderName: patientName,
-          text: data.content,
-          attachmentUrl: data.attachmentUrl,
-          attachmentType: data.attachmentType,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          isMe: false
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const formatted = snapshot.docs.map((docSnap) => {
+        const msg = docSnap.data();
+        const isMe = String(msg.senderId) === myId;
+        return {
+          id: docSnap.id,
+          senderId: String(msg.senderId),
+          senderName: isMe ? (user?.name || 'Dr. Fahim Ahmed') : patientName,
+          text: msg.text || msg.content || '',
+          attachmentUrl: msg.attachmentUrl || null,
+          attachmentType: msg.attachmentType || null,
+          createdAt: msg.createdAt || new Date().toISOString(),
+          timestamp: msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          isMe: isMe
         };
-        updateMessages(newMsg);
-      }
+      });
+
+      formatted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+      setMessages(formatted);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
     });
 
-    return () => {
-      socketRef.current.disconnect();
-    };
-  }, [partnerId, userRoomId, apptRoomId, user?.id, patientName]);
+    return () => unsubscribe();
+  }, [roomId, myId, patientName]);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
-    const textToSend = inputText;
+    const textToSend = inputText.trim();
     setInputText('');
 
-    const docMsg = {
-      id: Math.random().toString(),
-      senderId: user.id.toString(),
-      senderName: `Dr. ${user.name}`,
-      text: textToSend,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isMe: true
-    };
-    updateMessages(docMsg);
-
     try {
-      await api.post('/chat/send', {
-        receiverId: partnerId,
-        content: textToSend,
-        appointmentId: appointment?.id
+      await addDoc(collection(db, 'messages'), {
+        roomId: roomId,
+        participants: [myId, patientId],
+        senderId: myId,
+        senderName: user?.name || 'Dr. Fahim Ahmed',
+        senderAvatar: user?.avatar || '',
+        receiverId: patientId,
+        receiverName: patientName,
+        receiverAvatar: patientAvatar || '',
+        text: textToSend,
+        isRead: false,
+        createdAt: new Date().toISOString()
       });
-
-      if (socketRef.current) {
-        socketRef.current.emit('send_message', {
-          senderId: user.id,
-          receiverId: partnerId,
-          content: textToSend,
-          roomId: userRoomId
-        });
-        if (apptRoomId) {
-          socketRef.current.emit('send_message', {
-            senderId: user.id,
-            receiverId: partnerId,
-            content: textToSend,
-            roomId: apptRoomId
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Send error:', error);
-      Alert.alert('Error', 'Failed to send message.');
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+    } catch (err) {
+      console.error('Error sending doctor message:', err);
     }
   };
 
@@ -159,63 +95,84 @@ const PatientChatScreen = ({ route, navigation }) => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Avatar uri={patientAvatar} name={patientName} size={40} />
-        <View style={styles.headerText}>
-          <Text style={styles.patientName} numberOfLines={1}>{patientName}</Text>
-          <Text style={styles.patientAge}>Active Consultation</Text>
+        
+        <View style={styles.patientInfo}>
+          <Avatar uri={patientAvatar} size={42} name={patientName} />
+          <View style={styles.headerText}>
+            <Text style={styles.patientName} numberOfLines={1}>{patientName}</Text>
+            <Text style={styles.statusSub}>Active Patient Consultation</Text>
+          </View>
         </View>
-        <TouchableOpacity 
-          style={[styles.headerActionBtn, { marginRight: 8 }]} 
-          onPress={() => navigation.navigate('PatientVault', { patientId: partnerId, patientName: patientName })}
-        >
-          <Ionicons name="folder-open" size={20} color={colors.primary} />
-          <Text style={styles.headerActionBtnText}>Vault</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.headerActionBtn} 
-          onPress={() => navigation.navigate('Prescription', { patientName: patientName, patientId: partnerId, appointmentId: appointment?.id })}
-        >
-          <Ionicons name="document-text" size={20} color={colors.primary} />
-          <Text style={styles.headerActionBtnText}>Rx</Text>
-        </TouchableOpacity>
+
+        {/* Doctor Quick Action Tools */}
+        <View style={styles.headerActions}>
+          <TouchableOpacity 
+            style={styles.actionToolBtn} 
+            onPress={() => navigation.navigate('PatientVault', { patientId, patientName })}
+          >
+            <Ionicons name="folder-open-outline" size={20} color={colors.primary} />
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={[styles.actionToolBtn, styles.rxBtn]} 
+            onPress={() => navigation.navigate('Prescription', { patientId, patientName, appointmentId: appointment?.id })}
+          >
+            <Ionicons name="receipt-outline" size={20} color={colors.white} />
+          </TouchableOpacity>
+        </View>
       </View>
 
+      <View style={styles.encryptedBanner}>
+        <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
+        <Text style={styles.encryptedText}>Direct Doctor-Patient Tele-Consultation</Text>
+      </View>
+
+      {/* Messages */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.messageList}
+        contentContainerStyle={styles.messageContent}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      >
+        {messages.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.textLight} />
+            <Text style={styles.emptyText}>Consultation with {patientName}</Text>
+            <Text style={styles.emptySubText}>You can message this patient directly anytime. Use the buttons above to review their health vault or issue digital prescriptions.</Text>
+          </View>
+        ) : (
+          messages.map((item) => (
+            <ChatBubble
+              key={item.id}
+              message={item}
+              isMe={item.isMe}
+              avatar={item.isMe ? user?.avatar : patientAvatar}
+            />
+          ))
+        )}
+      </ScrollView>
+
+      {/* Input */}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-        enabled={Platform.OS === 'ios'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View style={{ flex: 1 }}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.chatArea}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-        >
-          {messages.map((msg) => (
-            <ChatBubble key={msg.id} message={msg} />
-          ))}
-        </ScrollView>
-      </View>
-
-        {/* Input Bar */}
-        <View style={styles.inputBar}>
+        <View style={styles.inputContainer}>
           <TextInput
-            style={styles.input}
-            placeholder="Type clinical advice..."
+            style={styles.textInput}
+            placeholder="Type your medical advice..."
             placeholderTextColor={colors.textLight}
             value={inputText}
             onChangeText={setInputText}
-            onSubmitEditing={handleSend}
-            onKeyPress={(e) => {
-              if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
+            multiline
+            maxLength={1000}
           />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+
+          <TouchableOpacity 
+            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]} 
+            onPress={handleSend}
+            disabled={!inputText.trim()}
+          >
             <Ionicons name="send" size={20} color={colors.white} />
           </TouchableOpacity>
         </View>
@@ -239,68 +196,119 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border
   },
   backBtn: {
-    marginRight: 12,
-    padding: 4
+    padding: 6,
+    marginRight: 6
+  },
+  patientInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center'
   },
   headerText: {
-    flex: 1,
-    marginLeft: 12
+    marginLeft: 10,
+    flex: 1
   },
   patientName: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.textPrimary
   },
-  patientAge: {
-    fontSize: 11,
-    color: colors.textSecondary,
-    marginTop: 2
+  statusSub: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
+    marginTop: 1
   },
-  headerActionBtn: {
+  headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryFaded,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8
+    gap: 8
   },
-  headerActionBtnText: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: colors.primaryDark,
-    marginLeft: 4
+  actionToolBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(42, 157, 143, 0.1)',
+    alignItems: 'center',
+    justifyContent: 'center'
   },
-  chatArea: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    flexGrow: 1
+  rxBtn: {
+    backgroundColor: colors.primary
   },
-  inputBar: {
+  encryptedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(42, 157, 143, 0.1)',
+    paddingVertical: 8,
     paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 8,
+    gap: 6
+  },
+  encryptedText: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600'
+  },
+  messageList: {
+    flex: 1
+  },
+  messageContent: {
+    padding: 16,
+    paddingBottom: 20
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 80,
+    paddingHorizontal: 30
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginTop: 12
+  },
+  emptySubText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.border
   },
-  input: {
+  textInput: {
     flex: 1,
-    height: 44,
+    minHeight: 40,
+    maxHeight: 100,
     backgroundColor: colors.background,
-    borderRadius: 22,
+    borderRadius: 20,
     paddingHorizontal: 16,
+    paddingVertical: 8,
     fontSize: 15,
-    color: colors.textPrimary,
-    marginRight: 12
+    color: colors.textPrimary
   },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.primary,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    marginLeft: 8
+  },
+  sendBtnDisabled: {
+    opacity: 0.5
   }
 });
 

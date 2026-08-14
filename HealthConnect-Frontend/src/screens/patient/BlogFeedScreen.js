@@ -1,7 +1,8 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TextInput, ScrollView, TouchableOpacity, useWindowDimensions, ActivityIndicator, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TextInput, ScrollView, TouchableOpacity, useWindowDimensions, ActivityIndicator, Platform } from 'react-native';;
 import { Ionicons } from '@expo/vector-icons';
-import { getBlogs } from '../../services/blogsApi';
+import { getBlogs, subscribeBlogs } from '../../services/blogsApi';
 import BlogCard from '../../components/BlogCard';
 import colors from '../../utils/colors';
 import { useAuth } from '../../context/AuthContext';
@@ -25,15 +26,10 @@ const BlogFeedScreen = ({ route, navigation }) => {
   }, [route.params?.filter]);
 
   useEffect(() => {
-    fetchBlogs();
-  }, [selectedCategory]);
-
-  const fetchBlogs = async () => {
-    try {
-      setLoading(true);
-      const data = await getBlogs();
+    setLoading(true);
+    const unsubscribe = subscribeBlogs((data) => {
       const formatted = (data || []).map((blog) => {
-        const category = blog.tags && blog.tags.length > 0 ? blog.tags[0] : 'Health';
+        const category = blog.tags && blog.tags.length > 0 ? blog.tags[0] : (blog.category || 'Health');
         return {
           ...blog,
           id: String(blog.id),
@@ -46,12 +42,11 @@ const BlogFeedScreen = ({ route, navigation }) => {
         };
       });
       setBlogs(formatted);
-    } catch (error) {
-      console.error('Error fetching blogs from Firestore:', error);
-    } finally {
       setLoading(false);
-    }
-  };
+    });
+
+    return () => unsubscribe();
+  }, []);
 
 
   const categoriesToDisplay = (user?.role === 'doctor' || user?.role === 'admin')

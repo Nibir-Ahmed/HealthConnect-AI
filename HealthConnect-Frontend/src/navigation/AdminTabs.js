@@ -5,8 +5,11 @@ import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import DoctorVerificationScreen from '../screens/admin/DoctorVerificationScreen';
 import PatientDirectoryScreen from '../screens/admin/PatientDirectoryScreen';
 import AdminSettingsScreen from '../screens/admin/AdminSettingsScreen';
+import { Platform } from 'react-native';
 import colors from '../utils/colors';
+
 const Tab = createBottomTabNavigator();
+
 const AdminTabs = () => {
   return (
     <Tab.Navigator
@@ -16,17 +19,23 @@ const AdminTabs = () => {
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.white,
-          borderTopWidth: 0,
-          height: 80,
-          paddingBottom: 12,
-          paddingTop: 8,
-          boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
-          elevation: 10
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(0,0,0,0.06)',
+          height: Platform.OS === 'ios' ? 84 : 66,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          paddingTop: 6,
+          boxShadow: '0px -2px 10px rgba(0,0,0,0.06)',
+          elevation: 8
+        },
+        tabBarItemStyle: {
+          paddingHorizontal: 0,
+          paddingVertical: 2,
         },
         tabBarLabelStyle: {
-          fontSize: 13,
+          fontSize: 11,
           fontWeight: '600',
-          marginTop: 4
+          marginTop: 2,
+          letterSpacing: -0.2,
         }
       }}
     >
@@ -36,7 +45,7 @@ const AdminTabs = () => {
         options={{
           tabBarLabel: 'Dashboard',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'analytics' : 'analytics-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'stats-chart' : 'stats-chart-outline'} size={22} color={color} />
           )
         }}
       />
@@ -44,9 +53,9 @@ const AdminTabs = () => {
         name="AdminVerification"
         component={DoctorVerificationScreen}
         options={{
-          tabBarLabel: 'Verify',
+          tabBarLabel: 'Doctors',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'checkbox' : 'checkbox-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'shield-checkmark' : 'shield-checkmark-outline'} size={22} color={color} />
           )
         }}
       />
@@ -54,9 +63,9 @@ const AdminTabs = () => {
         name="AdminPatients"
         component={PatientDirectoryScreen}
         options={{
-          tabBarLabel: 'Patients',
+          tabBarLabel: 'Users & Roles',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'people' : 'people-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'people' : 'people-outline'} size={22} color={color} />
           )
         }}
       />
@@ -66,11 +75,12 @@ const AdminTabs = () => {
         options={{
           tabBarLabel: 'Settings',
           tabBarIcon: ({ color, focused }) => (
-            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={24} color={color} />
+            <Ionicons name={focused ? 'settings' : 'settings-outline'} size={22} color={color} />
           )
         }}
       />
     </Tab.Navigator>
   );
 };
+
 export default AdminTabs;

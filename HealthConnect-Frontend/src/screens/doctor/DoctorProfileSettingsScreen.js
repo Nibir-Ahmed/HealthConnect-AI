@@ -34,7 +34,7 @@ const DoctorProfileSettingsScreen = () => {
         <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
         {/* Doctor Info Card */}
         <View style={styles.profileCard}>
-          <Avatar uri={user?.avatar || 'doc_1.jpg'} size={80} />
+          <Avatar uri={user?.avatar} name={user?.name || 'Doctor'} size={80} />
           <Text style={styles.name}>{user?.name || 'Doctor Name'}</Text>
           <Text style={styles.specialty}>{user?.specialty || 'General Physician'}</Text>
           <Text style={styles.hospital}>{user?.university || 'HealthConnect Medical'}</Text>

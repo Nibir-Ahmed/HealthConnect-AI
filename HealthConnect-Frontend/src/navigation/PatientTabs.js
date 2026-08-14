@@ -7,8 +7,11 @@ import BlogFeedScreen from '../screens/patient/BlogFeedScreen';
 import MyAppointmentsScreen from '../screens/patient/MyAppointmentsScreen';
 import MessagesScreen from '../screens/common/MessagesScreen';
 import ProfileScreen from '../screens/patient/ProfileScreen';
+import { Platform } from 'react-native';
 import colors from '../utils/colors';
+
 const Tab = createBottomTabNavigator();
+
 const PatientTabs = () => {
   return (
     <Tab.Navigator
@@ -18,17 +21,23 @@ const PatientTabs = () => {
         tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
           backgroundColor: colors.white,
-          borderTopWidth: 0,
-          height: 80,
-          paddingBottom: 12,
-          paddingTop: 8,
-          boxShadow: '0px 4px 8px rgba(0,0,0,0.1)',
-          elevation: 10
+          borderTopWidth: 1,
+          borderTopColor: 'rgba(0,0,0,0.06)',
+          height: Platform.OS === 'ios' ? 84 : 66,
+          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          paddingTop: 6,
+          boxShadow: '0px -2px 10px rgba(0,0,0,0.06)',
+          elevation: 8
+        },
+        tabBarItemStyle: {
+          paddingHorizontal: 0,
+          paddingVertical: 2,
         },
         tabBarLabelStyle: {
-          fontSize: 13,
+          fontSize: 10.5,
           fontWeight: '600',
-          marginTop: 4
+          marginTop: 2,
+          letterSpacing: -0.2,
         }
       })}
     >

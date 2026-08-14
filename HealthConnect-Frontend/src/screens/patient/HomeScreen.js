@@ -5,9 +5,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import Avatar from '../../components/Avatar';
 import Card from '../../components/Card';
-import { getBlogs } from '../../services/blogsApi';
-import api from '../../services/api';
+import { getBlogs, subscribeBlogs } from '../../services/blogsApi';
+import { getBlogCoverSource } from '../../utils/blogAssets';
 import colors from '../../utils/colors';
+
 const FEATURES = [
   { label: 'HealthConnect AI', icon: 'chatbubble-ellipses-outline', route: 'EmergencyChat', color: colors.emergencyFaded, iconColor: colors.emergency },
   { label: 'Find Doctors', icon: 'people-outline', route: 'DoctorList', color: 'rgba(59, 130, 246, 0.1)', iconColor: '#3B82F6' },
@@ -19,16 +20,17 @@ const FEATURES = [
   { label: 'Saved Blogs', icon: 'bookmark-outline', route: 'SavedBlogs', color: 'rgba(249, 115, 22, 0.1)', iconColor: '#F97316' },
   { label: 'Near Hospital', icon: 'map-outline', route: 'NearestHospital', color: 'rgba(99, 102, 241, 0.1)', iconColor: '#6366F1' }
 ];
+
 const HomeScreen = ({ navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
   const { user } = useAuth();
   const [blogs, setBlogs] = useState([]);
+
   useEffect(() => {
-    const fetchBlogs = async () => {
-      const data = await getBlogs();
-      setBlogs(data);
-    };
-    fetchBlogs();
+    const unsubscribe = subscribeBlogs((data) => {
+      setBlogs(data || []);
+    });
+    return () => unsubscribe();
   }, []);
   const getImageUrl = (url) => {
     if (!url) return null;
@@ -36,15 +38,23 @@ const HomeScreen = ({ navigation }) => {
     const baseUrl = api.defaults.baseURL.replace('/api', '');
     return { uri: `${baseUrl}${url}` };
   };
+  const handleFeaturePress = (route) => {
+    if (route === 'EmergencyChat') {
+      navigation.navigate('MainTabs', { screen: 'Emergency' });
+    } else {
+      navigation.navigate(route);
+    }
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
         <View>
-          <Text style={styles.welcomeText}>Hi, {user?.name.split(' ')[0]}</Text>
+          <Text style={styles.welcomeText}>Hi, {user?.name ? user.name.split(' ')[0] : 'There'}</Text>
           <Text style={styles.subWelcome}>How are you feeling today?</Text>
         </View>
         <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-          <Avatar uri={user?.avatar} size={48} />
+          <Avatar uri={user?.avatar} name={user?.name || 'User'} size={48} />
         </TouchableOpacity>
       </View>
       <View style={{ flex: 1 }}>
@@ -76,26 +86,18 @@ const HomeScreen = ({ navigation }) => {
               key={index}
               style={styles.gridItem}
               activeOpacity={0.7}
-              onPress={() => {
-                if (item.route === 'EmergencyChat') {
-                  navigation.navigate('MainTabs', { screen: 'Emergency' });
-                } else if (item.route === 'MyAppointments') {
-                  navigation.navigate('MainTabs', { screen: 'Appointments' });
-                } else {
-                  navigation.navigate(item.route);
-                }
-              }}
+              onPress={() => handleFeaturePress(item.route)}
             >
               <View style={[styles.gridIconCircle, { backgroundColor: item.color }]}>
-                <Ionicons name={item.icon} size={28} color={item.iconColor} />
+                <Ionicons name={item.icon} size={26} color={item.iconColor} />
               </View>
               <Text style={styles.gridLabel}>{item.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
-        {/* Blog Carousel */}
+        {/* Health Articles */}
         <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Health Article Library</Text>
+          <Text style={styles.sectionTitle}>Daily Health Guides</Text>
           <TouchableOpacity onPress={() => navigation.navigate('MainTabs', { screen: 'Blogs' })}>
             <Text style={styles.seeAll}>See All</Text>
           </TouchableOpacity>
@@ -105,7 +107,7 @@ const HomeScreen = ({ navigation }) => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.carouselContainer}
         >
-          {blogs.slice(0, 3).map((blog) => (
+          {blogs.slice(0, 4).map((blog) => (
             <TouchableOpacity
               key={blog.id}
               style={styles.carouselCard}
@@ -113,13 +115,13 @@ const HomeScreen = ({ navigation }) => {
               onPress={() => navigation.navigate('BlogDetail', { blog })}
             >
               <Image 
-                source={getImageUrl(blog.coverImage) || require('../../../assets/images/BloodPressure.png')} 
+                source={getBlogCoverSource(blog.coverImage)} 
                 style={styles.carouselImage} 
               />
               <View style={styles.carouselInfo}>
-                <Text style={styles.carouselCategory}>{blog.tags && blog.tags.length > 0 ? blog.tags[0] : 'Health'}</Text>
+                <Text style={styles.carouselCategory}>{blog.tags && blog.tags.length > 0 ? blog.tags[0] : (blog.category || 'Health')}</Text>
                 <Text style={styles.carouselBlogTitle} numberOfLines={2}>{blog.title}</Text>
-                <Text style={styles.carouselAuthor}>By {blog.author?.name || 'Unknown'}</Text>
+                <Text style={styles.carouselAuthor}>By {blog.author?.name || 'Doctor'}</Text>
               </View>
             </TouchableOpacity>
           ))}

@@ -1,19 +1,19 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';;
 import { Ionicons } from '@expo/vector-icons';
 import BlogCard from '../../components/BlogCard';
-import { getSavedBlogs } from '../../services/blogsApi';
+import { getSavedBlogs, subscribeSavedBlogs } from '../../services/blogsApi';
 import colors from '../../utils/colors';
 
 const SavedBlogsScreen = ({ navigation }) => {
   const [savedBlogs, setSavedBlogs] = useState([]);
 
   useEffect(() => {
-    const fetchSavedBlogs = async () => {
-      const data = await getSavedBlogs();
-      setSavedBlogs(data);
-    };
-    fetchSavedBlogs();
+    const unsubscribe = subscribeSavedBlogs((data) => {
+      setSavedBlogs(data || []);
+    });
+    return () => unsubscribe();
   }, []);
 
   return (

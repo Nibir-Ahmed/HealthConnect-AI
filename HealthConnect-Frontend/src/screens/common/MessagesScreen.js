@@ -1,56 +1,97 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import Avatar from '../../components/Avatar';
 import colors from '../../utils/colors';
-import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { db } from '../../services/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const MessagesScreen = () => {
-  const [inbox, setInbox] = useState([]);
+  const [conversations, setConversations] = useState([]);
   const [loading, setLoading] = useState(true);
   const navigation = useNavigation();
   const { user } = useAuth();
+  const myId = String(user?.uid || user?.id || 'user');
 
-  useFocusEffect(
-    React.useCallback(() => {
-      fetchInbox();
-    }, [])
-  );
+  useEffect(() => {
+    if (!myId) return;
 
-  const fetchInbox = async () => {
-    try {
-      const response = await api.get('/chat/inbox');
-      setInbox(response.data);
-    } catch (error) {
-      console.error('Error fetching inbox:', error);
-    } finally {
+    const messagesRef = collection(db, 'messages');
+    const q = query(messagesRef, where('participants', 'array-contains', myId));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const convMap = {};
+
+      snapshot.docs.forEach((docSnap) => {
+        const msg = docSnap.data();
+        const roomId = msg.roomId || docSnap.id;
+        const isMe = String(msg.senderId) === myId;
+        const partnerId = isMe ? msg.receiverId : msg.senderId;
+        const partnerName = isMe ? (msg.receiverName || 'User') : (msg.senderName || 'User');
+        const partnerAvatar = isMe ? msg.receiverAvatar : msg.senderAvatar;
+
+        const msgDate = new Date(msg.createdAt || Date.now());
+
+        if (!convMap[roomId] || new Date(convMap[roomId].lastMessage.createdAt) < msgDate) {
+          convMap[roomId] = {
+            id: roomId,
+            partner: {
+              id: partnerId,
+              name: partnerName,
+              avatar: partnerAvatar,
+              role: user?.role === 'doctor' ? 'patient' : 'doctor'
+            },
+            lastMessage: {
+              content: msg.text || msg.content || '',
+              senderId: msg.senderId,
+              createdAt: msg.createdAt || new Date().toISOString()
+            },
+            unreadCount: (!isMe && !msg.isRead) ? 1 : 0
+          };
+        }
+      });
+
+      const convList = Object.values(convMap).sort((a, b) => 
+        new Date(b.lastMessage.createdAt) - new Date(a.lastMessage.createdAt)
+      );
+
+      setConversations(convList);
       setLoading(false);
-    }
-  };
+    }, (err) => {
+      console.error('Error listening to messages inbox:', err);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [myId, user?.role]);
 
   const navigateToChat = (partner) => {
-    if (user.role === 'patient') {
-      const doctorData = {
-        id: partner.id, 
-        User: partner,
-        name: partner.name,
-      };
-      navigation.navigate('DoctorChat', { doctor: doctorData });
+    if (user?.role === 'doctor') {
+      navigation.navigate('PatientChat', {
+        patient: {
+          id: partner.id,
+          name: partner.name,
+          avatar: partner.avatar
+        }
+      });
     } else {
-      const patientData = {
-        id: partner.id,
-        User: partner,
-        name: partner.name,
-      };
-      navigation.navigate('PatientChat', { patient: patientData });
+      navigation.navigate('DoctorChat', {
+        doctor: {
+          id: partner.id,
+          name: partner.name,
+          avatar: partner.avatar,
+          specialty: 'Medical Specialist'
+        }
+      });
     }
   };
 
   const renderItem = ({ item }) => {
     const { partner, lastMessage, unreadCount } = item;
-    const isMe = lastMessage.senderId === user.id;
+    const isMe = String(lastMessage.senderId) === myId;
 
     const date = new Date(lastMessage.createdAt);
     const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -61,7 +102,7 @@ const MessagesScreen = () => {
         onPress={() => navigateToChat(partner)}
         activeOpacity={0.7}
       >
-        <Avatar uri={partner.avatar} size={50} online={partner.isOnline} />
+        <Avatar uri={partner.avatar} size={50} name={partner.name} />
         <View style={styles.chatInfo}>
           <View style={styles.topLine}>
             <Text style={styles.name} numberOfLines={1}>{partner.name}</Text>
@@ -84,9 +125,11 @@ const MessagesScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color={colors.primary} />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={colors.primary} />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -96,16 +139,20 @@ const MessagesScreen = () => {
         <Text style={styles.headerTitle}>Messages</Text>
       </View>
       
-      {inbox.length === 0 ? (
+      {conversations.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons name="chatbubbles-outline" size={64} color={colors.border} />
-          <Text style={styles.emptyText}>No messages yet.</Text>
+          <Ionicons name="chatbubbles-outline" size={64} color={colors.textLight} />
+          <Text style={styles.emptyText}>No messages yet</Text>
+          <Text style={styles.emptySubText}>
+            {user?.role === 'doctor' 
+              ? 'Incoming messages and consultations from patients will appear here.'
+              : 'Messages from your consultations with doctors will appear here.'}
+          </Text>
         </View>
       ) : (
         <FlatList
-          data={inbox}
-          keyExtractor={(item) => item.partner.id.toString()}
-          style={{ flex: 1 }}
+          data={conversations}
+          keyExtractor={(item) => item.id}
           renderItem={renderItem}
           contentContainerStyle={styles.listContent}
         />
@@ -117,96 +164,102 @@ const MessagesScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: colors.background
   },
   header: {
     paddingHorizontal: 20,
     paddingVertical: 16,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: colors.border
   },
   headerTitle: {
     fontSize: 22,
     fontWeight: '800',
-    color: colors.textPrimary,
+    color: colors.textPrimary
   },
   center: {
     flex: 1,
     justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'center'
   },
   emptyContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 30
   },
   emptyText: {
-    marginTop: 16,
-    fontSize: 16,
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginTop: 16
+  },
+  emptySubText: {
+    fontSize: 13,
     color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 19
   },
   listContent: {
-    paddingBottom: 24,
+    paddingVertical: 8
   },
   chatRow: {
     flexDirection: 'row',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    alignItems: 'center',
+    borderBottomColor: colors.border
   },
   chatInfo: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: 14
   },
   topLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 4
   },
   name: {
     fontSize: 16,
     fontWeight: '700',
     color: colors.textPrimary,
     flex: 1,
-    marginRight: 8,
+    marginRight: 8
   },
   time: {
     fontSize: 12,
-    color: colors.textLight,
+    color: colors.textLight
   },
   bottomLine: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
+    alignItems: 'center'
   },
   lastMessage: {
     fontSize: 14,
     color: colors.textSecondary,
     flex: 1,
-    marginRight: 16,
+    marginRight: 8
   },
   unreadMessageText: {
-    color: colors.textPrimary,
     fontWeight: '700',
+    color: colors.textPrimary
   },
   unreadBadge: {
     backgroundColor: colors.primary,
-    borderRadius: 12,
-    minWidth: 24,
-    height: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 10,
     paddingHorizontal: 6,
+    paddingVertical: 2
   },
   unreadText: {
     color: colors.white,
-    fontSize: 12,
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '800'
   }
 });
 

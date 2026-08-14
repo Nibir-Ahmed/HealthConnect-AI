@@ -1,80 +1,136 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Card from '../../components/Card';
 import Avatar from '../../components/Avatar';
 import Badge from '../../components/Badge';
 import colors from '../../utils/colors';
-import { getDoctorAppointments } from '../../services/appointmentsApi';
+import { db } from '../../services/firebase';
+import { collection, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { useAuth } from '../../context/AuthContext';
 
 const DoctorAppointmentsScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState('all'); // 'all', 'pending', 'confirmed', 'completed'
 
   useEffect(() => {
-    fetchAppointments();
-  }, []);
-
-  const fetchAppointments = async () => {
-    try {
-      setLoading(true);
-      const data = await getDoctorAppointments();
-      setAppointments(data);
-    } catch (error) {
-      console.error('Failed to fetch appointments:', error);
-      Alert.alert('Error', 'Failed to load appointments');
-    } finally {
+    const unsub = onSnapshot(collection(db, 'appointments'), (snapshot) => {
+      const appts = [];
+      snapshot.forEach((d) => {
+        const data = d.data();
+        if (!data.doctorId || data.doctorId === user?.id || data.doctorId === user?.uid || data.doctorName?.includes(user?.name)) {
+          appts.push({ id: d.id, ...data });
+        }
+      });
+      setAppointments(appts);
       setLoading(false);
+    }, (err) => {
+      console.error('Error fetching appointments:', err);
+      setLoading(false);
+    });
+
+    return () => unsub();
+  }, [user]);
+
+  const handleUpdateStatus = async (apptId, newStatus) => {
+    try {
+      await updateDoc(doc(db, 'appointments', apptId), {
+        status: newStatus
+      });
+      const msg = `Appointment marked as ${newStatus}.`;
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert('Updated', msg);
+    } catch (e) {
+      console.error('Update appointment status error:', e);
     }
   };
 
-  const formatTime = (timeString) => {
-    if (!timeString) return '';
-    const [hours, minutes] = timeString.split(':');
-    const date = new Date();
-    date.setHours(hours, minutes);
-    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  };
+  const filteredAppointments = appointments.filter((a) => {
+    if (filter === 'all') return true;
+    return (a.status || 'pending') === filter;
+  });
 
   const renderItem = ({ item }) => {
-    const patientName = item.patient?.name || 'Unknown Patient';
-    const avatar = item.patient?.avatar || require('../../../assets/images/sara.png');
-    
-    // Inject patientId into patient object for the chat screen
-    const chatAppointment = {
-      ...item,
-      patient: {
-        ...(item.patient || {}),
-        id: item.patientId || item.patient?.id
-      }
-    };
+    const patientName = item.patientName || item.patient?.name || 'Patient';
+    const avatar = item.patientAvatar || item.patient?.avatar;
+    const status = item.status || 'pending';
 
     return (
       <Card style={styles.apptCard}>
         <View style={styles.cardHeader}>
-          <Avatar uri={avatar} size={44} />
+          <Avatar uri={avatar} name={patientName} size={48} />
           <View style={styles.patientInfo}>
             <Text style={styles.patientName}>{patientName}</Text>
-            <Text style={styles.patientSub}>Consultation type: {item.type}</Text>
+            <Text style={styles.patientSub}>{item.type || 'In-Person Consultation'} • {item.symptoms || 'Regular Checkup'}</Text>
           </View>
-          <Badge text={item.status.toUpperCase()} variant={item.status === 'confirmed' ? 'success' : 'warning'} />
+          <Badge
+            text={status.toUpperCase()}
+            variant={status === 'confirmed' ? 'success' : status === 'completed' ? 'primary' : 'warning'}
+          />
         </View>
 
         <View style={styles.divider} />
 
-        <View style={styles.cardFooter}>
+        <View style={styles.metaRow}>
           <View style={styles.timeRow}>
-            <Ionicons name="time-outline" size={16} color={colors.primary} />
-            <Text style={styles.timeText}>{item.date} • {formatTime(item.time)}</Text>
+            <Ionicons name="calendar-outline" size={15} color={colors.primary} />
+            <Text style={styles.timeText}>{item.date || 'Today'}</Text>
           </View>
+          <View style={styles.timeRow}>
+            <Ionicons name="time-outline" size={15} color="#3B82F6" />
+            <Text style={styles.timeText}>{item.time || '10:00 AM'}</Text>
+          </View>
+        </View>
 
-          <TouchableOpacity
-            style={styles.connectBtn}
-            onPress={() => navigation.navigate('PatientChat', { appointment: chatAppointment })}
-          >
-            <Text style={styles.connectBtnText}>Connect Chat</Text>
-            <Ionicons name="chevron-forward" size={14} color={colors.white} />
-          </TouchableOpacity>
+        {/* Action Controls */}
+        <View style={styles.cardActions}>
+          {status === 'pending' && (
+            <>
+              <TouchableOpacity
+                style={[styles.btnAction, styles.btnDecline]}
+                onPress={() => handleUpdateStatus(item.id, 'cancelled')}
+              >
+                <Ionicons name="close-circle-outline" size={16} color={colors.emergency} />
+                <Text style={styles.btnDeclineText}>Decline</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnAction, styles.btnAccept]}
+                onPress={() => handleUpdateStatus(item.id, 'confirmed')}
+              >
+                <Ionicons name="checkmark-circle-outline" size={16} color={colors.white} />
+                <Text style={styles.btnAcceptText}>Accept</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {status === 'confirmed' && (
+            <>
+              <TouchableOpacity
+                style={[styles.btnAction, styles.btnComplete]}
+                onPress={() => handleUpdateStatus(item.id, 'completed')}
+              >
+                <Ionicons name="checkmark-done" size={16} color="#10B981" />
+                <Text style={styles.btnCompleteText}>Complete Visit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.btnAction, styles.btnChat]}
+                onPress={() => navigation.navigate('PatientChat', { appointment: item })}
+              >
+                <Ionicons name="chatbubble-ellipses-outline" size={16} color={colors.white} />
+                <Text style={styles.btnChatText}>Open Chat</Text>
+              </TouchableOpacity>
+            </>
+          )}
+
+          {status === 'completed' && (
+            <View style={styles.completedBox}>
+              <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+              <Text style={styles.completedText}>Consultation Completed</Text>
+            </View>
+          )}
         </View>
       </Card>
     );
@@ -83,30 +139,53 @@ const DoctorAppointmentsScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>My Consultations</Text>
-        <TouchableOpacity onPress={fetchAppointments}>
-          <Ionicons name="refresh" size={24} color={colors.primary} />
-        </TouchableOpacity>
+        <View>
+          <Text style={styles.headerTitle}>My Consultations</Text>
+          <Text style={styles.headerSubtitle}>Manage appointments & clinical visits</Text>
+        </View>
+        <View style={styles.countBadge}>
+          <Text style={styles.countText}>{filteredAppointments.length}</Text>
+        </View>
+      </View>
+
+      {/* Filter Tabs */}
+      <View style={styles.filterSection}>
+        {[
+          { key: 'all', label: `All (${appointments.length})` },
+          { key: 'pending', label: `Pending (${appointments.filter(a => (a.status || 'pending') === 'pending').length})` },
+          { key: 'confirmed', label: `Confirmed (${appointments.filter(a => a.status === 'confirmed').length})` },
+          { key: 'completed', label: `Done (${appointments.filter(a => a.status === 'completed').length})` }
+        ].map((tab) => (
+          <TouchableOpacity
+            key={tab.key}
+            style={[styles.filterTab, filter === tab.key && styles.filterTabActive]}
+            onPress={() => setFilter(tab.key)}
+          >
+            <Text style={[styles.filterTabText, filter === tab.key && styles.filterTabTextActive]}>
+              {tab.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
       </View>
 
       {loading ? (
         <View style={styles.centerContainer}>
           <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={{ marginTop: 12, color: colors.textSecondary }}>Loading appointments...</Text>
         </View>
       ) : (
         <FlatList
-          data={appointments}
-          keyExtractor={(item) => item.id.toString()}
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.listContainer}
-          renderItem={renderItem}
+          data={filteredAppointments}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
           ListEmptyComponent={
-            <View style={styles.centerContainer}>
+            <View style={styles.emptyContainer}>
               <Ionicons name="calendar-outline" size={48} color={colors.textLight} />
-              <Text style={styles.emptyText}>No appointments booked</Text>
-              <Text style={styles.emptySubText}>Patients haven't booked any consultations yet.</Text>
+              <Text style={styles.emptyTitle}>No appointments found</Text>
+              <Text style={styles.emptySubtitle}>When patients schedule a visit, it will appear here.</Text>
             </View>
           }
+          renderItem={renderItem}
         />
       )}
     </SafeAreaView>
@@ -119,40 +198,104 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center'
+    borderBottomColor: colors.border
   },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: colors.textPrimary
   },
-  listContainer: {
-    padding: 20,
-    flexGrow: 1
+  headerSubtitle: {
+    fontSize: 12,
+    color: colors.textSecondary,
+    marginTop: 2
+  },
+  countBadge: {
+    backgroundColor: colors.primaryFaded,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12
+  },
+  countText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primary
+  },
+  filterSection: {
+    flexDirection: 'row',
+    backgroundColor: colors.white,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    gap: 8,
+    flexWrap: 'wrap'
+  },
+  filterTab: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border
+  },
+  filterTabActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary
+  },
+  filterTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary
+  },
+  filterTabTextActive: {
+    color: colors.white
   },
   centerContainer: {
     flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 32
+  },
+  emptyContainer: {
+    padding: 40,
     alignItems: 'center',
     justifyContent: 'center'
   },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginTop: 12
+  },
+  emptySubtitle: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 4
+  },
   apptCard: {
-    marginBottom: 16,
-    padding: 16
+    padding: 16,
+    marginBottom: 12,
+    borderRadius: 14
   },
   cardHeader: {
     flexDirection: 'row',
     alignItems: 'center'
   },
   patientInfo: {
-    marginLeft: 12,
-    flex: 1
+    flex: 1,
+    marginLeft: 12
   },
   patientName: {
     fontSize: 15,
@@ -166,48 +309,84 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: colors.divider,
-    marginVertical: 14
+    backgroundColor: colors.border,
+    marginVertical: 12
   },
-  cardFooter: {
+  metaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between'
+    gap: 16,
+    marginBottom: 12
   },
   timeRow: {
     flexDirection: 'row',
-    alignItems: 'center'
+    alignItems: 'center',
+    gap: 6
   },
   timeText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: colors.textPrimary,
-    marginLeft: 6
+    fontSize: 12,
+    color: colors.textSecondary,
+    fontWeight: '600'
   },
-  connectBtn: {
+  cardActions: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingTop: 4
+  },
+  btnAction: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8
+    justifyContent: 'center',
+    paddingVertical: 9,
+    borderRadius: 10,
+    gap: 6
   },
-  connectBtnText: {
-    fontSize: 12,
-    fontWeight: '700',
+  btnAccept: {
+    backgroundColor: colors.primary
+  },
+  btnAcceptText: {
     color: colors.white,
-    marginRight: 4
+    fontSize: 12,
+    fontWeight: '700'
   },
-  emptyText: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: colors.textPrimary,
-    marginTop: 12
+  btnDecline: {
+    backgroundColor: colors.emergencyFaded
   },
-  emptySubText: {
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginTop: 4
+  btnDeclineText: {
+    color: colors.emergency,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  btnComplete: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)'
+  },
+  btnCompleteText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  btnChat: {
+    backgroundColor: colors.primary
+  },
+  btnChatText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '700'
+  },
+  completedBox: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+    borderRadius: 10
+  },
+  completedText: {
+    color: '#10B981',
+    fontSize: 12,
+    fontWeight: '700'
   }
 });
 

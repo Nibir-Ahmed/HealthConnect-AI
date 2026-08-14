@@ -1,17 +1,20 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet,  ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Alert, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../../components/Avatar';
 import ChatBubble from '../../components/ChatBubble';
 import HealthVaultModal from '../../components/HealthVaultModal';
 import colors from '../../utils/colors';
-import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { db } from '../../services/firebase';
 import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
 
+const getRoomId = (id1, id2) => {
+  const s1 = String(id1 || '');
+  const s2 = String(id2 || '');
+  return s1 < s2 ? `chat_${s1}_${s2}` : `chat_${s2}_${s1}`;
+};
 
 const DoctorChatScreen = ({ route, navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
@@ -19,174 +22,96 @@ const DoctorChatScreen = ({ route, navigation }) => {
   const appointment = route.params?.appointment;
   const doctor = appointment?.doctor || route.params?.doctor;
   
-  const doctorName = doctor?.User?.name || doctor?.name || 'Dr. Unknown';
-  const doctorSpecialty = doctor?.specialty || 'Specialist';
-  const doctorAvatar = doctor?.User?.avatar || doctor?.avatar || require('../../../assets/images/doc_1.jpg');
-  const partnerId = doctor?.User?.id || doctor?.userId || doctor?.id;
+  const doctorName = doctor?.User?.name || doctor?.name || 'Dr. Fahim Ahmed';
+  const doctorSpecialty = doctor?.specialty || 'General Practitioner';
+  const doctorAvatar = doctor?.User?.avatar || doctor?.avatar;
+  const doctorId = String(doctor?.User?.id || doctor?.userId || doctor?.id || 'doc_cardiology_1');
+  const myId = String(user?.uid || user?.id || 'patient_user');
   
-  const userRoomId = `chat_${Math.min(user?.id || 0, partnerId || 0)}_${Math.max(user?.id || 0, partnerId || 0)}`;
-  const apptRoomId = appointment?.id ? `appt_${appointment.id}` : null;
+  const roomId = getRoomId(myId, doctorId);
 
   const [messages, setMessages] = useState([]);
   const [inputText, setInputText] = useState('');
   const [vaultModalVisible, setVaultModalVisible] = useState(false);
   const scrollViewRef = useRef();
-  const socketRef = useRef(null);
-
-  const updateMessages = (updater) => {
-    setMessages((prev) => {
-      const updated = typeof updater === 'function' ? updater(prev) : [...prev, updater];
-      if (partnerId && user?.id) {
-        const cacheKey = `chat_cache_${user.id}_${partnerId}`;
-        AsyncStorage.setItem(cacheKey, JSON.stringify(updated)).catch(() => {});
-      }
-      return updated;
-    });
-  };
 
   useEffect(() => {
-    const cacheKey = `chat_cache_${user?.id}_${partnerId}`;
-
-    const loadCachedMessages = async () => {
-      if (!partnerId || !user?.id) return;
-      try {
-        const cached = await AsyncStorage.getItem(cacheKey);
-        if (cached) {
-          setMessages(JSON.parse(cached));
-        }
-      } catch (e) {}
-    };
-    loadCachedMessages();
-
     // Real-time Firestore Chat Listener
     const messagesRef = collection(db, 'messages');
-    const q = query(messagesRef, where('roomId', '==', userRoomId));
+    const q = query(messagesRef, where('roomId', '==', roomId));
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       const formatted = snapshot.docs.map((docSnap) => {
         const msg = docSnap.data();
-        const isMe = String(msg.senderId) === String(user?.id);
+        const isMe = String(msg.senderId) === myId;
         return {
           id: docSnap.id,
           senderId: String(msg.senderId),
-          senderName: isMe ? user?.name : doctorName,
+          senderName: isMe ? (user?.name || 'You') : doctorName,
           text: msg.text || msg.content || '',
           attachmentUrl: msg.attachmentUrl || null,
           attachmentType: msg.attachmentType || null,
+          createdAt: msg.createdAt || new Date().toISOString(),
           timestamp: msg.createdAt ? new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
           isMe: isMe
         };
       });
+
+      formatted.sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
       setMessages(formatted);
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
     });
 
     return () => unsubscribe();
-  }, [partnerId, userRoomId, user?.id, doctorName]);
+  }, [roomId, myId, doctorName]);
 
   const handleSend = async () => {
     if (!inputText.trim()) return;
 
-    const textToSend = inputText;
+    const textToSend = inputText.trim();
     setInputText('');
 
     try {
       await addDoc(collection(db, 'messages'), {
-        roomId: userRoomId,
-        senderId: String(user.id || user.uid),
-        receiverId: String(partnerId),
+        roomId: roomId,
+        participants: [myId, doctorId],
+        senderId: myId,
+        senderName: user?.name || 'Patient',
+        senderAvatar: user?.avatar || '',
+        receiverId: doctorId,
+        receiverName: doctorName,
+        receiverAvatar: doctorAvatar || '',
         text: textToSend,
         isRead: false,
         createdAt: new Date().toISOString()
       });
+      setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (err) {
-      console.error('Error sending message to Firestore:', err);
-    }
-
-    // Send to backend
-    try {
-      await api.post('/chat/send', {
-        receiverId: partnerId,
-        content: textToSend,
-        appointmentId: appointment?.id
-      });
-
-      // Emit via socket
-      if (socketRef.current) {
-        socketRef.current.emit('send_message', {
-          senderId: user.id,
-          receiverId: partnerId,
-          content: textToSend,
-          roomId: userRoomId
-        });
-        if (apptRoomId) {
-          socketRef.current.emit('send_message', {
-            senderId: user.id,
-            receiverId: partnerId,
-            content: textToSend,
-            roomId: apptRoomId
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Error sending message to backend:', err);
+      console.error('Error sending message:', err);
     }
   };
 
-  const handleSelectRecord = async (record) => {
+  const handleSelectVaultItem = async (item) => {
     setVaultModalVisible(false);
-    if (!record) return;
-
-    // Send the record as an attachment
-    const textToSend = `Attached Report: ${record.title}`;
-    
-    const userMsg = {
-      id: Math.random().toString(),
-      senderId: user.id.toString(),
-      senderName: user.name,
-      text: textToSend,
-      attachmentUrl: record.fileUrl,
-      attachmentType: record.fileType,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      isMe: true
-    };
-    setMessages((prev) => [...prev, userMsg]);
-
     try {
-      await api.post('/chat/send', {
-        receiverId: partnerId,
-        content: textToSend,
-        attachmentUrl: record.fileUrl,
-        attachmentType: record.fileType,
-        appointmentId: appointment?.id
+      await addDoc(collection(db, 'messages'), {
+        roomId: roomId,
+        participants: [myId, doctorId],
+        senderId: myId,
+        senderName: user?.name || 'Patient',
+        senderAvatar: user?.avatar || '',
+        receiverId: doctorId,
+        receiverName: doctorName,
+        receiverAvatar: doctorAvatar || '',
+        text: `Shared Document: ${item.title}`,
+        attachmentUrl: item.fileUrl,
+        attachmentType: item.type || 'document',
+        isRead: false,
+        createdAt: new Date().toISOString()
       });
-
-      if (socketRef.current) {
-        socketRef.current.emit('send_message', {
-          senderId: user.id,
-          receiverId: partnerId,
-          content: textToSend,
-          attachmentUrl: record.fileUrl,
-          attachmentType: record.fileType,
-          roomId: userRoomId
-        });
-        if (apptRoomId) {
-          socketRef.current.emit('send_message', {
-            senderId: user.id,
-            receiverId: partnerId,
-            content: textToSend,
-            attachmentUrl: record.fileUrl,
-            attachmentType: record.fileType,
-            roomId: apptRoomId
-          });
-        }
-      }
-    } catch (error) {
-      console.error('Error sharing report:', error);
+    } catch (err) {
+      console.error('Error sharing vault item:', err);
     }
-  };
-
-  const handleAttach = () => {
-    setVaultModalVisible(true);
   };
 
   return (
@@ -196,70 +121,90 @@ const DoctorChatScreen = ({ route, navigation }) => {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
-        <Avatar uri={doctorAvatar} name={doctorName} size={40} />
-        <View style={styles.headerText}>
-          <Text style={styles.docName} numberOfLines={1}>{doctorName}</Text>
-          <Text style={styles.docSpecialty}>{doctorSpecialty}</Text>
-        </View>
-        <TouchableOpacity style={styles.callIcon} onPress={() => Alert.alert('Voice Call', 'Calling doctor...')}>
-          <Ionicons name="call" size={22} color={colors.primary} />
+        
+        <TouchableOpacity 
+          style={styles.doctorInfo}
+          onPress={() => navigation.navigate('DoctorProfile', { doctor })}
+        >
+          <Avatar uri={doctorAvatar} size={42} name={doctorName} />
+          <View style={styles.headerText}>
+            <Text style={styles.doctorName} numberOfLines={1}>{doctorName}</Text>
+            <Text style={styles.doctorSpecialty} numberOfLines={1}>{doctorSpecialty}</Text>
+          </View>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.callBtn} onPress={() => alert('Starting Secure Tele-Consultation Voice Link...')}>
+          <Ionicons name="call" size={20} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={{ flex: 1 }}
-        enabled={Platform.OS === 'ios'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-      >
-        <View style={{ flex: 1 }}>
-        <ScrollView
-          ref={scrollViewRef}
-          style={{ flex: 1 }}
-          contentContainerStyle={styles.chatArea}
-          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-        >
-          {/* Mini info notice */}
-          <View style={styles.infoNotice}>
-            <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
-            <Text style={styles.infoNoticeText}>This clinical chat is encrypted and fully private.</Text>
-          </View>
-
-          {messages.map((msg) => (
-            <ChatBubble key={msg.id} message={msg} />
-          ))}
-        </ScrollView>
+      <View style={styles.encryptedBanner}>
+        <Ionicons name="shield-checkmark" size={16} color={colors.primary} />
+        <Text style={styles.encryptedText}>This clinical chat is encrypted and fully private.</Text>
       </View>
 
-        {/* Input Bar */}
-        <View style={styles.inputBar}>
-          <TouchableOpacity style={styles.attachBtn} onPress={handleAttach}>
-            <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
+      {/* Messages */}
+      <ScrollView
+        ref={scrollViewRef}
+        style={styles.messageList}
+        contentContainerStyle={styles.messageContent}
+        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+      >
+        {messages.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="chatbubbles-outline" size={48} color={colors.textLight} />
+            <Text style={styles.emptyText}>Start Consultation with {doctorName}</Text>
+            <Text style={styles.emptySubText}>Send a message, describe your symptoms, or share reports anytime.</Text>
+          </View>
+        ) : (
+          messages.map((item) => (
+            <ChatBubble
+              key={item.id}
+              message={item}
+              isMe={item.isMe}
+              avatar={item.isMe ? user?.avatar : doctorAvatar}
+            />
+          ))
+        )}
+      </ScrollView>
+
+      {/* Input */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+      >
+        <View style={styles.inputContainer}>
+          <TouchableOpacity 
+            style={styles.attachBtn} 
+            onPress={() => setVaultModalVisible(true)}
+          >
+            <Ionicons name="add-circle-outline" size={26} color={colors.primary} />
           </TouchableOpacity>
+
           <TextInput
-            style={styles.input}
+            style={styles.textInput}
             placeholder="Type your message here..."
             placeholderTextColor={colors.textLight}
             value={inputText}
             onChangeText={setInputText}
-            onSubmitEditing={handleSend}
-            onKeyPress={(e) => {
-              if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
-                e.preventDefault();
-                handleSend();
-              }
-            }}
+            multiline
+            maxLength={1000}
           />
-          <TouchableOpacity style={styles.sendButton} onPress={handleSend}>
+
+          <TouchableOpacity 
+            style={[styles.sendBtn, !inputText.trim() && styles.sendBtnDisabled]} 
+            onPress={handleSend}
+            disabled={!inputText.trim()}
+          >
             <Ionicons name="send" size={20} color={colors.white} />
           </TouchableOpacity>
         </View>
       </KeyboardAvoidingView>
 
-      <HealthVaultModal 
-        visible={vaultModalVisible} 
-        onClose={() => setVaultModalVisible(false)} 
-        onSelect={handleSelectRecord} 
+      <HealthVaultModal
+        visible={vaultModalVisible}
+        onClose={() => setVaultModalVisible(false)}
+        onSelect={handleSelectVaultItem}
       />
     </SafeAreaView>
   );
@@ -280,76 +225,110 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border
   },
   backBtn: {
-    marginRight: 12,
-    padding: 4
+    padding: 6,
+    marginRight: 6
+  },
+  doctorInfo: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center'
   },
   headerText: {
-    flex: 1,
-    marginLeft: 12
+    marginLeft: 10,
+    flex: 1
   },
-  docName: {
+  doctorName: {
     fontSize: 16,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.textPrimary
   },
-  docSpecialty: {
+  doctorSpecialty: {
     fontSize: 12,
     color: colors.primary,
-    marginTop: 2
+    fontWeight: '600',
+    marginTop: 1
   },
-  callIcon: {
+  callBtn: {
     padding: 8
   },
-  chatArea: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    flexGrow: 1
-  },
-  infoNotice: {
+  encryptedBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.primaryFaded,
-    borderRadius: 8,
-    padding: 10,
-    marginBottom: 16,
-    justifyContent: 'center'
-  },
-  infoNoticeText: {
-    fontSize: 12,
-    color: colors.primaryDark,
-    marginLeft: 6,
-    fontWeight: '500'
-  },
-  inputBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(42, 157, 143, 0.1)',
+    paddingVertical: 8,
     paddingHorizontal: 16,
+    marginHorizontal: 16,
+    marginTop: 10,
+    borderRadius: 8,
+    gap: 6
+  },
+  encryptedText: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600'
+  },
+  messageList: {
+    flex: 1
+  },
+  messageContent: {
+    padding: 16,
+    paddingBottom: 20
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 80,
+    paddingHorizontal: 30
+  },
+  emptyText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: colors.textPrimary,
+    marginTop: 12
+  },
+  emptySubText: {
+    fontSize: 13,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: 6,
+    lineHeight: 18
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
     paddingVertical: 10,
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.border
   },
   attachBtn: {
-    marginRight: 12,
-    padding: 4
+    padding: 6,
+    marginRight: 4
   },
-  input: {
+  textInput: {
     flex: 1,
-    height: 44,
+    minHeight: 40,
+    maxHeight: 100,
     backgroundColor: colors.background,
-    borderRadius: 22,
+    borderRadius: 20,
     paddingHorizontal: 16,
+    paddingVertical: 8,
     fontSize: 15,
-    color: colors.textPrimary,
-    marginRight: 12
+    color: colors.textPrimary
   },
-  sendButton: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  sendBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.primary,
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    marginLeft: 8
+  },
+  sendBtnDisabled: {
+    opacity: 0.5
   }
 });
 

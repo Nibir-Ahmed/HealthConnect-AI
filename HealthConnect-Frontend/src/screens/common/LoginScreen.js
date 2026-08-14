@@ -53,15 +53,18 @@ const LoginScreen = ({ route, navigation }) => {
     setError('');
     setLoading(true);
     try {
+      const provider = new GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+
       if (Platform.OS === 'web') {
-        const provider = new GoogleAuthProvider();
         try {
           const result = await signInWithPopup(auth, provider);
           const user = result.user;
           
           const googleUserData = {
+            uid: user.uid,
             email: user.email,
-            name: user.displayName,
+            name: user.displayName || 'Google User',
             avatar: user.photoURL,
             role: role
           };
@@ -75,7 +78,25 @@ const LoginScreen = ({ route, navigation }) => {
           await signInWithRedirect(auth, provider);
         }
       } else {
-        setError('Google Login is currently only supported on Web.');
+        try {
+          const result = await signInWithPopup(auth, provider);
+          const user = result.user;
+          const googleUserData = {
+            uid: user.uid,
+            email: user.email,
+            name: user.displayName || 'Google User',
+            avatar: user.photoURL,
+            role: role
+          };
+          const loginResult = await googleLogin(googleUserData);
+          if (!loginResult.success) {
+            setError(loginResult.message);
+          }
+        } catch (mobileError) {
+          console.log('Mobile Google Sign-In redirect fallback...', mobileError);
+          await AsyncStorage.setItem('pendingGoogleLoginRole', role);
+          await signInWithRedirect(auth, provider);
+        }
       }
     } catch (error) {
       console.error('Firebase Google Login Error:', error);

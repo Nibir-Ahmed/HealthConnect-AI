@@ -1,31 +1,35 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Platform } from 'react-native';;
 import { Ionicons } from '@expo/vector-icons';
-import api from '../../services/api';
+import { getPatientAppointments, updateAppointmentStatus } from '../../services/appointmentsApi';
+import { useAuth } from '../../context/AuthContext';
 import AppointmentCard from '../../components/AppointmentCard';
 import colors from '../../utils/colors';
 
 const MyAppointmentsScreen = ({ navigation }) => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState('upcoming'); // upcoming, past
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetchAppointments();
-  }, []);
+  }, [user]);
 
   const fetchAppointments = async () => {
     try {
-      const response = await api.get('/appointments/patient');
-      const formatted = response.data.map(appt => ({
+      setLoading(true);
+      const data = await getPatientAppointments(user?.id || user?.uid);
+      const formatted = (data || []).map(appt => ({
         id: appt.id.toString(),
         doctor: {
-          id: appt.doctor?.id,
+          id: appt.doctor?.id || appt.doctorId,
           userId: appt.doctor?.userId,
-          name: appt.doctor?.User?.name || 'Unknown Doctor',
-          specialty: appt.doctor?.specialty || 'General',
-          avatar: appt.doctor?.User?.avatar || 'https://via.placeholder.com/150',
-          isOnline: appt.doctor?.User?.isOnline !== false
+          name: appt.doctor?.name || appt.doctor?.User?.name || 'Dr. Specialist',
+          specialty: appt.doctor?.specialty || 'General Practitioner',
+          avatar: appt.doctor?.avatar || appt.doctor?.User?.avatar,
+          isOnline: true
         },
         date: appt.date,
         time: appt.time,
@@ -33,7 +37,7 @@ const MyAppointmentsScreen = ({ navigation }) => {
       }));
       setAppointments(formatted);
     } catch (error) {
-      console.error('Error fetching appointments:', error);
+      console.error('Error fetching appointments from Firestore:', error);
     } finally {
       setLoading(false);
     }
@@ -42,7 +46,7 @@ const MyAppointmentsScreen = ({ navigation }) => {
   const handleCancel = (appointmentId) => {
     const executeCancel = async () => {
       try {
-        await api.put(`/appointments/${appointmentId}/status`, { status: 'cancelled' });
+        await updateAppointmentStatus(appointmentId, 'cancelled');
         if (Platform.OS === 'web') {
           alert('Appointment cancelled successfully.');
         } else {
@@ -50,7 +54,7 @@ const MyAppointmentsScreen = ({ navigation }) => {
         }
         fetchAppointments();
       } catch (err) {
-        console.error('Error cancelling appointment:', err);
+        console.error('Error cancelling appointment in Firestore:', err);
         Alert.alert('Error', 'Failed to cancel appointment. Please try again.');
       }
     };
@@ -82,7 +86,14 @@ const MyAppointmentsScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => (navigation.canGoBack() ? navigation.goBack() : navigation.navigate('Home'))}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>My Appointments</Text>
+        <View style={{ width: 40 }} />
       </View>
 
       {/* Tabs */}
@@ -142,15 +153,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.border
   },
+  backBtn: {
+    padding: 4
+  },
   headerTitle: {
-    fontSize: 20,
-    fontWeight: '700',
+    fontSize: 18,
+    fontWeight: '800',
     color: colors.textPrimary
   },
   tabContainer: {

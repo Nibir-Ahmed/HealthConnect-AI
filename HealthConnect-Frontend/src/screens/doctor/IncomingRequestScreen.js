@@ -1,5 +1,6 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';;
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../../components/Avatar';
 import Button from '../../components/Button';
@@ -43,7 +44,7 @@ const IncomingRequestScreen = ({ route, navigation }) => {
         {/* Pulsing Avatar Area */}
         <View style={styles.avatarArea}>
           <View style={styles.pulseBg} />
-          <Avatar uri={require('../../../assets/images/sara.png')} size={100} />
+          <Avatar uri={request.patient?.avatar} name={request.patient?.name} size={100} />
         </View>
 
         <Text style={styles.patientName}>{request.patient?.name || 'Unknown Patient'}</Text>

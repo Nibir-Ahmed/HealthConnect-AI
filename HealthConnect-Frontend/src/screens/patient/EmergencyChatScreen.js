@@ -1,7 +1,7 @@
 import React, { useState, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Linking, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import api from '../../services/api';
+import { processAITriage } from '../../services/aiService';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../../components/Avatar';
 import ChatBubble from '../../components/ChatBubble';
@@ -59,12 +59,8 @@ const EmergencyChatScreen = ({ navigation }) => {
     }));
 
     try {
-      const response = await api.post('/ai/triage', {
-        symptoms: userQuery,
-        history: historyPayload
-      });
-
-      const { reply, severity, suggestedPrompts: newPrompts } = response.data;
+      const response = await processAITriage(userQuery, historyPayload);
+      const { reply, severity, suggestedPrompts: newPrompts } = response;
 
       if (severity === 'critical' || severity === 'high') {
         setIsSeverityDetected(true);
@@ -86,7 +82,7 @@ const EmergencyChatScreen = ({ navigation }) => {
       console.error('AI Chat Error:', error);
       const errorMessage = {
         id: Math.random().toString(),
-        text: 'Dukkhto, AI server connection-e shamosha hocche. Apni r ektu por try koren ba direct doctor consult koren.',
+        text: 'Dukkhto, AI response generate korte shamosha hoyeche. Please try again.',
         isMe: false,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
       };

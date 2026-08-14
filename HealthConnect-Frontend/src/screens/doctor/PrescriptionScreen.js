@@ -6,10 +6,13 @@ import Input from '../../components/Input';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import colors from '../../utils/colors';
-import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../services/firebase';
+import { collection, addDoc } from 'firebase/firestore';
 
 const PrescriptionScreen = ({ route, navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
+  const { user } = useAuth();
   const patientName = route.params?.patientName || 'Patient';
   const patientId = route.params?.patientId;
   const appointmentId = route.params?.appointmentId;
@@ -32,15 +35,23 @@ const PrescriptionScreen = ({ route, navigation }) => {
         duration: duration
       }];
 
-      await api.post('/prescriptions', {
-        patientId,
-        appointmentId,
-        medications: JSON.stringify(medications),
-        notes: advice
+      await addDoc(collection(db, 'prescriptions'), {
+        patientId: String(patientId || 'patient_user'),
+        patientName: patientName,
+        appointmentId: appointmentId ? String(appointmentId) : '',
+        doctorId: user?.uid || user?.id || 'doc_cardiology_1',
+        doctor: {
+          id: user?.uid || user?.id || 'doc_cardiology_1',
+          name: user?.name || 'Dr. Fahim Ahmed',
+          specialty: user?.specialty || 'General Practitioner'
+        },
+        medications: medications,
+        notes: advice,
+        createdAt: new Date().toISOString()
       });
 
       if (Platform.OS === 'web') {
-        alert(`Success: Prescription has been sent to ${patientName} and logged in their health vault.`);
+        window.alert(`Success: Prescription has been sent to ${patientName} and logged in their health vault.`);
         navigation.goBack();
       } else {
         Alert.alert('Success', 'Prescription has been sent to the patient and logged in their health vault.', [
@@ -48,8 +59,8 @@ const PrescriptionScreen = ({ route, navigation }) => {
         ]);
       }
     } catch (error) {
-      console.error('Error issuing prescription:', error);
-      Alert.alert('Error', 'Failed to issue prescription.');
+      console.error('Error issuing prescription in Firestore:', error);
+      Alert.alert('Error', 'Failed to issue prescription: ' + error.message);
     } finally {
       setLoading(false);
     }
@@ -100,58 +111,62 @@ const PrescriptionScreen = ({ route, navigation }) => {
           <Text style={styles.patientSub}>Active Consultation</Text>
         </Card>
 
-        {/* Medicine form */}
-        <View style={styles.formSection}>
-          <Text style={styles.sectionTitle}>Add Medicine</Text>
+        {/* Prescription Form */}
+        <Text style={styles.sectionTitle}>Add Medication Details</Text>
+        
+        <Input
+          label="Medicine Name & Generic"
+          placeholder="e.g. Amoxicillin / Paracetamol"
+          value={medName}
+          onChangeText={setMedName}
+          icon="medical-outline"
+        />
 
-          <Input
-            label="Search/Select Medicine"
-            placeholder="e.g. Metformin 500mg"
-            icon="medical-outline"
-            value={medName}
-            onChangeText={setMedName}
-          />
-
-          <View style={styles.formRow}>
+        <View style={styles.row}>
+          <View style={styles.col}>
             <Input
               label="Dosage"
-              placeholder="e.g. 1 Tablet"
-              icon="flask-outline"
+              placeholder="e.g. 500mg"
               value={dosage}
               onChangeText={setDosage}
-              style={{ flex: 1 }}
-            />
-            <View style={{ width: 12 }} />
-            <Input
-              label="Duration"
-              placeholder="e.g. 7 Days"
-              icon="calendar-outline"
-              value={duration}
-              onChangeText={setDuration}
-              style={{ flex: 1 }}
+              icon="fitness-outline"
             />
           </View>
-
-          <Input
-            label="Frequency"
-            placeholder="e.g. Once daily after breakfast"
-            icon="repeat-outline"
-            value={freq}
-            onChangeText={setFreq}
-          />
-
-          <Input
-            label="General Clinical Advice"
-            placeholder="e.g. Drink plenty of water and rest."
-            icon="information-circle-outline"
-            value={advice}
-            onChangeText={setAdvice}
-            multiline={true}
-            numberOfLines={3}
-          />
+          <View style={styles.col}>
+            <Input
+              label="Frequency"
+              placeholder="e.g. 1-0-1"
+              value={freq}
+              onChangeText={setFreq}
+              icon="time-outline"
+            />
+          </View>
         </View>
 
-        <Button title="Issue Prescription" onPress={handleSubmit} style={styles.submitBtn} />
+        <Input
+          label="Duration"
+          placeholder="e.g. 5 Days / 2 Weeks"
+          value={duration}
+          onChangeText={setDuration}
+          icon="calendar-outline"
+        />
+
+        <Text style={styles.sectionTitle}>Doctor's Advice & Guidelines</Text>
+        <Input
+          placeholder="e.g. Take medicine after food. Drink plenty of water and rest."
+          value={advice}
+          onChangeText={setAdvice}
+          multiline
+          numberOfLines={3}
+          style={styles.adviceInput}
+        />
+
+        <Button
+          title="Issue Digital Prescription"
+          onPress={handleSubmit}
+          loading={loading}
+          style={styles.submitBtn}
+        />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -168,7 +183,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingVertical: 14,
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: colors.border
@@ -178,7 +193,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.textPrimary
   },
   scrollContainer: {
@@ -186,46 +201,48 @@ const styles = StyleSheet.create({
     paddingBottom: 40
   },
   patientCard: {
-    marginBottom: 24,
-    padding: 16
+    padding: 16,
+    borderRadius: 14,
+    marginBottom: 20
   },
   patientLabel: {
     fontSize: 10,
     fontWeight: '700',
     color: colors.textSecondary,
-    letterSpacing: 0.5
+    letterSpacing: 0.5,
+    marginBottom: 4
   },
   patientName: {
     fontSize: 18,
     fontWeight: '800',
-    color: colors.textPrimary,
-    marginTop: 6
+    color: colors.textPrimary
   },
   patientSub: {
     fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4
-  },
-  formSection: {
-    backgroundColor: colors.white,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginBottom: 32
+    color: colors.primary,
+    marginTop: 2,
+    fontWeight: '600'
   },
   sectionTitle: {
     fontSize: 15,
-    fontWeight: '700',
+    fontWeight: '800',
     color: colors.textPrimary,
-    marginBottom: 16
+    marginTop: 10,
+    marginBottom: 12
   },
-  formRow: {
+  row: {
     flexDirection: 'row',
-    width: '100%'
+    gap: 12
+  },
+  col: {
+    flex: 1
+  },
+  adviceInput: {
+    height: 80,
+    textAlignVertical: 'top'
   },
   submitBtn: {
-    marginTop: 8
+    marginTop: 24
   }
 });
 

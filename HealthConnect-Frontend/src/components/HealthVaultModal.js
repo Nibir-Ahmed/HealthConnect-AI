@@ -2,9 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, Modal, TouchableOpacity, FlatList, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../utils/colors';
-import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import { db } from '../services/firebase';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 const HealthVaultModal = ({ visible, onClose, onSelect }) => {
+  const { user } = useAuth();
   const [records, setRecords] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -12,15 +15,19 @@ const HealthVaultModal = ({ visible, onClose, onSelect }) => {
     if (visible) {
       fetchRecords();
     }
-  }, [visible]);
+  }, [visible, user]);
 
   const fetchRecords = async () => {
     try {
       setLoading(true);
-      const res = await api.get('/records/ehr');
-      setRecords(res.data);
+      const userId = user?.uid || user?.id || 'patient_user';
+      const q = query(collection(db, 'records'), where('patientId', '==', String(userId)));
+      const snap = await getDocs(q);
+      const recList = [];
+      snap.forEach(d => recList.push({ id: d.id, ...d.data() }));
+      setRecords(recList);
     } catch (error) {
-      console.error('Error fetching vault records:', error);
+      console.error('Error fetching vault records from Firestore:', error);
     } finally {
       setLoading(false);
     }
@@ -29,7 +36,7 @@ const HealthVaultModal = ({ visible, onClose, onSelect }) => {
   const getFileIcon = (fileUrl) => {
     if (!fileUrl) return 'document-text';
     const ext = fileUrl.split('.').pop().toLowerCase();
-    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return 'image';
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext) || fileUrl.startsWith('data:image')) return 'image';
     return 'document-text';
   };
 
@@ -49,7 +56,7 @@ const HealthVaultModal = ({ visible, onClose, onSelect }) => {
       </View>
       <View style={styles.recordInfo}>
         <Text style={styles.fileName} numberOfLines={1}>{item.title}</Text>
-        <Text style={styles.metaText}>{item.date}</Text>
+        <Text style={styles.metaText}>{item.date || 'Medical Record'}</Text>
       </View>
     </TouchableOpacity>
   );
@@ -98,21 +105,26 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    marginBottom: 16,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: '700',
+    fontWeight: 'bold',
     color: colors.textPrimary,
+  },
+  emptyText: {
+    textAlign: 'center',
+    color: colors.textLight,
+    marginVertical: 20,
   },
   recordItem: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border
+    borderBottomColor: colors.border,
   },
   fileIconBox: {
     width: 44,
@@ -120,27 +132,21 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 12
+    marginRight: 12,
   },
   recordInfo: {
-    flex: 1
+    flex: 1,
   },
   fileName: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '600',
-    color: colors.textPrimary
+    color: colors.textPrimary,
   },
   metaText: {
     fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 4
+    color: colors.textLight,
+    marginTop: 2,
   },
-  emptyText: {
-    textAlign: 'center',
-    color: colors.textSecondary,
-    marginTop: 20,
-    marginBottom: 40
-  }
 });
 
 export default HealthVaultModal;

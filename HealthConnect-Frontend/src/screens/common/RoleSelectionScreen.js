@@ -1,5 +1,6 @@
+import { SafeAreaView } from 'react-native-safe-area-context';
 import React from 'react';
-import { View, Text, StyleSheet, SafeAreaView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';;
 import { Ionicons } from '@expo/vector-icons';
 import colors from '../../utils/colors';
 const RoleCard = ({ title, description, icon, color, onPress }) => (

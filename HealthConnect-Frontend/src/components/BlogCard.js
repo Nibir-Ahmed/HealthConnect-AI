@@ -4,19 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import Badge from './Badge';
 import colors from '../utils/colors';
 import { toggleSaveBlog } from '../services/blogsApi';
-import api from '../services/api';
+import { getBlogCoverSource } from '../utils/blogAssets';
 const BlogCard = ({ blog, onPress, style }) => {
   const { id, coverImage, tags, title, author, readTime, likes } = blog;
-  const category = tags && tags.length > 0 ? tags[0] : null;
-  const authorName = author?.name || 'Unknown Author';
+  const category = tags && tags.length > 0 ? tags[0] : (blog.category || 'Health');
+  const authorName = author?.name || 'Health Professional';
   
   const [saved, setSaved] = useState(blog.isSaved || false);
-  const getImageUrl = (url) => {
-    if (!url) return null;
-    if (url.startsWith('http')) return { uri: url };
-    const baseUrl = api.defaults.baseURL.replace('/api', '');
-    return { uri: `${baseUrl}${url}` };
-  };
   const toggleSave = async () => {
     // optimistic update
     setSaved(!saved);
@@ -35,7 +29,7 @@ const BlogCard = ({ blog, onPress, style }) => {
     <TouchableOpacity style={[styles.card, style]} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.imageContainer}>
         <Image 
-          source={getImageUrl(coverImage) || require('../../assets/images/BloodPressure.png')} 
+          source={getBlogCoverSource(coverImage)} 
           style={styles.coverImage} 
           resizeMode="cover" 
         />

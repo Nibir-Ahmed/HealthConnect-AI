@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, Image, TouchableOpacity, Share, Alert, useWindowDimensions, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import Badge from '../../components/Badge';
+import { getBlogCoverSource } from '../../utils/blogAssets';
+import Avatar from '../../components/Avatar';
 import colors from '../../utils/colors';
-import api from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
+import { deleteBlog, toggleLikeBlog, toggleSaveBlog } from '../../services/blogsApi';
 
 const BlogDetailScreen = ({ route, navigation }) => {
   const { width, height: windowHeight } = useWindowDimensions();
@@ -30,7 +31,7 @@ const BlogDetailScreen = ({ route, navigation }) => {
 
   const executeDelete = async () => {
     try {
-      await api.delete(`/blogs/${blog.id}`);
+      await deleteBlog(blog.id);
       if (Platform.OS === 'web') window.alert('Article deleted successfully.');
       else Alert.alert('Success', 'Article deleted successfully.');
       navigation.goBack();
@@ -43,9 +44,8 @@ const BlogDetailScreen = ({ route, navigation }) => {
 
   const getImageUrl = (url) => {
     if (!url) return null;
-    if (url.startsWith('http')) return { uri: url };
-    const baseUrl = api.defaults.baseURL.replace('/api', '');
-    return { uri: `${baseUrl}${url}` };
+    if (url.startsWith('http') || url.startsWith('data:')) return { uri: url };
+    return null;
   };
   const renderContent = (text) => {
     if (!text) return null;
@@ -57,35 +57,31 @@ const BlogDetailScreen = ({ route, navigation }) => {
     });
   };
   const handleLike = async () => {
-    // Optimistic update
     const newIsLiked = !isLiked;
     setIsLiked(newIsLiked);
-    setLikesCount(newIsLiked ? likesCount + 1 : likesCount - 1);
+    setLikesCount(newIsLiked ? likesCount + 1 : Math.max(0, likesCount - 1));
     
     try {
-      await api.post(`/blogs/${blog.id}/like`);
+      await toggleLikeBlog(blog.id, likesCount, isLiked);
     } catch (error) {
-      // Revert on error
       setIsLiked(!newIsLiked);
-      setLikesCount(!newIsLiked ? likesCount + 1 : likesCount - 1);
+      setLikesCount(likesCount);
       console.error('Error toggling like:', error);
     }
   };
   const handleSave = async () => {
-    // Optimistic update
     const newIsSaved = !isSaved;
     setIsSaved(newIsSaved);
     try {
-      await api.post(`/blogs/${blog.id}/save`);
-      Alert.alert(
-        newIsSaved ? 'Saved' : 'Removed',
-        newIsSaved ? 'Article saved to your collection!' : 'Article removed from Saved collection.'
-      );
+      await toggleSaveBlog(blog.id);
+      const msg = newIsSaved ? 'Article saved to your collection!' : 'Article removed from Saved collection.';
+      if (Platform.OS === 'web') window.alert(msg);
+      else Alert.alert(newIsSaved ? 'Saved' : 'Removed', msg);
     } catch (error) {
-      // Revert on error
       setIsSaved(!newIsSaved);
       console.error('Error toggling save:', error);
-      Alert.alert('Error', 'Failed to update saved status.');
+      if (Platform.OS === 'web') window.alert('Failed to update saved status.');
+      else Alert.alert('Error', 'Failed to update saved status.');
     }
   };
   const handleShare = async () => {
@@ -122,24 +118,19 @@ const BlogDetailScreen = ({ route, navigation }) => {
           showsVerticalScrollIndicator={false}
         >
           <Image 
-            source={getImageUrl(blog.coverImage) || require('../../../assets/images/BloodPressure.png')} 
+            source={getBlogCoverSource(blog.coverImage)} 
             style={[styles.coverImage, isLargeScreen && styles.coverImageWeb]} 
           />
           <View style={styles.content}>
-            <Badge text={blog.tags && blog.tags.length > 0 ? blog.tags[0] : 'Health'} variant="primary" style={styles.categoryBadge} />
-            <Text style={styles.title}>{blog.title}</Text>
-            {/* Author info */}
             <View style={styles.authorRow}>
               <View style={styles.authorLeft}>
-                <View style={styles.authorAvatarPlaceholder}>
-                  <Ionicons name="person" size={18} color={colors.primary} />
-                </View>
+                <Avatar uri={blog.author?.avatar} name={blog.author?.name || 'Doctor'} size={38} />
                 <View style={styles.authorText}>
-                  <Text style={styles.authorName}>{blog.author?.name || 'Unknown Author'}</Text>
-                  <Text style={styles.authorTitle}>Medical Specialist</Text>
+                  <Text style={styles.authorName}>{blog.author?.name || 'Health Professional'}</Text>
+                  <Text style={styles.authorTitle}>{blog.author?.specialty || 'Medical Specialist'}</Text>
                 </View>
               </View>
-              <Text style={styles.dateText}>{new Date(blog.createdAt).toLocaleDateString()} • {blog.readTime || '5 min'}</Text>
+              <Text style={styles.dateText}>{blog.createdAt ? new Date(blog.createdAt).toLocaleDateString() : 'Recent'} • {blog.readTime || '5 min'}</Text>
             </View>
             <View style={styles.divider} />
             {/* Body Content */}

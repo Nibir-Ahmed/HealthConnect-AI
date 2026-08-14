@@ -1,5 +1,42 @@
 import { db } from './firebase';
-import { collection, getDocs, doc, getDoc, setDoc, query, where } from 'firebase/firestore';
+import { collection, getDocs, doc, getDoc, setDoc, deleteDoc, query, where, onSnapshot } from 'firebase/firestore';
+
+export const subscribeBlogs = (callback) => {
+  const unsubscribe = onSnapshot(
+    collection(db, 'blogs'),
+    (querySnapshot) => {
+      const blogs = [];
+      querySnapshot.forEach((docSnap) => {
+        blogs.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      callback(blogs);
+    },
+    (error) => {
+      console.error('Error listening to blogs in Firestore:', error);
+      callback([]);
+    }
+  );
+  return unsubscribe;
+};
+
+export const subscribeSavedBlogs = (callback) => {
+  const q = query(collection(db, 'blogs'), where('isSaved', '==', true));
+  const unsubscribe = onSnapshot(
+    q,
+    (querySnapshot) => {
+      const blogs = [];
+      querySnapshot.forEach((docSnap) => {
+        blogs.push({ id: docSnap.id, ...docSnap.data() });
+      });
+      callback(blogs);
+    },
+    (error) => {
+      console.error('Error listening to saved blogs in Firestore:', error);
+      callback([]);
+    }
+  );
+  return unsubscribe;
+};
 
 export const getBlogs = async () => {
   try {
@@ -59,4 +96,30 @@ export const toggleSaveBlog = async (id) => {
     return { saved: false };
   }
 };
+
+export const deleteBlog = async (id) => {
+  try {
+    const docRef = doc(db, 'blogs', String(id));
+    await deleteDoc(docRef);
+    return true;
+  } catch (error) {
+    console.error('Error deleting blog from Firestore:', error);
+    throw error;
+  }
+};
+
+export const toggleLikeBlog = async (id, currentLikes, isLiked) => {
+  try {
+    const docRef = doc(db, 'blogs', String(id));
+    await setDoc(docRef, {
+      likes: isLiked ? Math.max(0, currentLikes - 1) : currentLikes + 1,
+      isLiked: !isLiked
+    }, { merge: true });
+    return true;
+  } catch (error) {
+    console.error('Error updating like in Firestore:', error);
+    return false;
+  }
+};
+
 

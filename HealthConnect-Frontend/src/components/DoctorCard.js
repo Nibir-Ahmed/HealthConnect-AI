@@ -11,7 +11,7 @@ const DoctorCard = ({ doctor, onPress }) => {
   return (
     <TouchableOpacity style={styles.card} onPress={onPress} activeOpacity={0.7}>
       <View style={styles.topRow}>
-        <Avatar uri={avatar} size={56} online={isOnline} />
+        <Avatar uri={avatar} name={name} size={56} online={isOnline} />
         <View style={styles.info}>
           <View style={styles.nameRow}>
             <Text style={styles.name} numberOfLines={1}>{name}</Text>

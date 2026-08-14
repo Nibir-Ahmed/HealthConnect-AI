@@ -2,20 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { View, Image, StyleSheet, Platform } from 'react-native';
 import colors from '../utils/colors';
 
-const DEFAULT_AVATAR = require('../../assets/images/sara.png');
-
-const getLocalAvatar = (uri) => {
-  if (typeof uri === 'string') {
-    if (uri.includes('doc_1')) return require('../../assets/images/doc_1.jpg');
-    if (uri.includes('doc_2')) return require('../../assets/images/doc_2.jpg');
-    if (uri.includes('doc_3')) return require('../../assets/images/doc_3.jpg');
-    if (uri.includes('doc_4')) return require('../../assets/images/doc_4.jpg');
-    if (uri.includes('doc_5')) return require('../../assets/images/doc_5.jpg');
-    if (uri.includes('doc_6')) return require('../../assets/images/doc_6.jpg');
-    if (uri.includes('doc_7')) return require('../../assets/images/doc_7.jpg');
-    if (uri.includes('doc_8')) return require('../../assets/images/doc_8.jpg');
-  }
-  return uri;
+const getInitialsAvatar = (name) => {
+  const cleanName = name && typeof name === 'string' && name.trim().length > 0 ? name.trim() : 'User';
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(cleanName)}&background=00A896&color=fff&bold=true`;
 };
 
 const Avatar = ({ uri, name, size = 48, online }) => {
@@ -28,19 +17,13 @@ const Avatar = ({ uri, name, size = 48, online }) => {
   const dotSize = Math.max(12, size * 0.25);
   const borderSize = Math.max(2, dotSize * 0.2);
 
-  let finalSource = DEFAULT_AVATAR;
-  if (name) {
-    finalSource = { uri: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=00A896&color=fff` };
-  }
+  let finalSource = { uri: getInitialsAvatar(name) };
 
   if (uri && !imgError) {
     if (typeof uri === 'number' || typeof uri === 'object') {
       finalSource = uri;
     } else if (typeof uri === 'string' && uri.trim().length > 0) {
-      const mapped = getLocalAvatar(uri);
-      if (mapped !== uri) {
-        finalSource = mapped;
-      } else {
+      if (!uri.includes('doc_') && !uri.includes('sara.png')) {
         let remoteUri = uri;
         if (Platform.OS === 'android' && uri.startsWith('http') && !uri.includes('googleusercontent.com') && !uri.match(/\.(jpeg|jpg|gif|png)$/i)) {
           remoteUri = uri + '#.png';

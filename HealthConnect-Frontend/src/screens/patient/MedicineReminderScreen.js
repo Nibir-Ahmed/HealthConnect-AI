@@ -24,6 +24,10 @@ const MedicineReminderScreen = ({ navigation }) => {
       prev.map((item) => (item.id === id ? { ...item, isActive: val } : item))
     );
   };
+  const handleDelete = (id) => {
+    setReminders((prev) => prev.filter((item) => item.id !== id));
+  };
+
   const handleAdd = () => {
     if (!name || !dosage || !time || !frequency) {
       Alert.alert('Form Error', 'Please complete all fields to set a reminder.');
@@ -88,6 +92,7 @@ const MedicineReminderScreen = ({ navigation }) => {
                   key={item.id}
                   medicine={item}
                   onToggle={(val) => handleToggle(item.id, val)}
+                  onDelete={() => handleDelete(item.id)}
                 />
               ))
             )}
