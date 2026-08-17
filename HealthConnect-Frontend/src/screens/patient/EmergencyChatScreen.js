@@ -1,6 +1,6 @@
-import React, { useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Linking, ActivityIndicator } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform, Keyboard, Linking, ActivityIndicator } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { processAITriage } from '../../services/aiService';
 import { Ionicons } from '@expo/vector-icons';
 import Avatar from '../../components/Avatar';
@@ -17,6 +17,7 @@ const INITIAL_PROMPTS = [
 ];
 
 const EmergencyChatScreen = ({ navigation }) => {
+  const insets = useSafeAreaInsets();
   const [messages, setMessages] = useState([
     {
       id: '1',
@@ -29,7 +30,27 @@ const EmergencyChatScreen = ({ navigation }) => {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSeverityDetected, setIsSeverityDetected] = useState(false);
+  const [keyboardVisible, setKeyboardVisible] = useState(false);
   const scrollViewRef = useRef();
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => {
+        setKeyboardVisible(true);
+        setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
+      }
+    );
+    const hideSub = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardVisible(false)
+    );
+
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const sendQueryToAI = async (userQuery) => {
     if (!userQuery.trim() || isLoading) return;
@@ -136,9 +157,9 @@ const EmergencyChatScreen = ({ navigation }) => {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
       >
         <View style={{ flex: 1 }}>
           <ScrollView
@@ -162,7 +183,7 @@ const EmergencyChatScreen = ({ navigation }) => {
         </View>
 
         {/* Suggested Prompts Section */}
-        {suggestedPrompts.length > 0 && !isLoading && (
+        {suggestedPrompts.length > 0 && !isLoading && !keyboardVisible && (
           <View style={styles.promptSection}>
             <Text style={styles.promptHeader}>
               <Ionicons name="sparkles" size={14} color={colors.primary} /> Suggested Prompts:
@@ -183,7 +204,7 @@ const EmergencyChatScreen = ({ navigation }) => {
         )}
 
         {/* Input Bar */}
-        <View style={styles.inputBar}>
+        <View style={[styles.inputBar, { paddingBottom: keyboardVisible ? 8 : Math.max(insets.bottom, 10) }]}>
           <TextInput
             style={styles.input}
             placeholder="Type symptoms in Banglish or English..."
