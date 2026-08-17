@@ -80,6 +80,18 @@ const DoctorProfileSettingsScreen = () => {
         {/* Actions */}
         <View style={styles.settingsSection}>
           <Card style={styles.listCard}>
+            <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate('HelpSupport')}>
+              <View style={styles.optionLeft}>
+                <View style={[styles.iconCircle, { backgroundColor: 'rgba(0, 168, 150, 0.1)' }]}>
+                  <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
+                </View>
+                <Text style={styles.optionLabel}>Help & Support</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textLight} />
+            </TouchableOpacity>
+
+            <View style={styles.divider} />
+
             <TouchableOpacity style={styles.optionRow} onPress={handleLogout}>
               <View style={styles.optionLeft}>
                 <View style={[styles.iconCircle, { backgroundColor: colors.emergencyFaded }]}>

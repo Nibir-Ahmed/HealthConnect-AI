@@ -107,10 +107,10 @@ const ProfileScreen = ({ navigation }) => {
         {/* Support Section */}
         <View style={[styles.settingsSection, { marginTop: 12 }]}>
           <Card style={styles.listCard}>
-            <TouchableOpacity style={styles.optionRow}>
+            <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate('HelpSupport')}>
               <View style={styles.optionLeft}>
-                <View style={[styles.iconCircle, { backgroundColor: 'rgba(107, 114, 128, 0.1)' }]}>
-                  <Ionicons name="help-circle-outline" size={20} color={colors.textSecondary} />
+                <View style={[styles.iconCircle, { backgroundColor: 'rgba(0, 168, 150, 0.1)' }]}>
+                  <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
                 </View>
                 <Text style={styles.optionLabel}>Help & Support</Text>
               </View>
