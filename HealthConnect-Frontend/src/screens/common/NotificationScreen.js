@@ -64,6 +64,16 @@ const NotificationScreen = ({ navigation }) => {
     }
   };
 
+  const handleSendTestNotification = async () => {
+    await sendNotification({
+      userId: user?.id || user?.uid,
+      title: 'HealthConnect Alert Test 🔔',
+      body: 'Your live notification system is working perfectly! You will receive updates for bookings, chats, and reminders.',
+      type: 'system',
+      route: 'EmergencyChat'
+    });
+  };
+
   const handleMarkAllRead = async () => {
     await markAllNotificationsAsRead(notifications);
   };
@@ -178,6 +188,14 @@ const NotificationScreen = ({ navigation }) => {
                   ? "You have no notifications right now. Important alerts will appear here."
                   : `No ${activeFilter} notifications found.`}
               </Text>
+              <TouchableOpacity 
+                style={styles.testBtn} 
+                onPress={handleSendTestNotification}
+                activeOpacity={0.8}
+              >
+                <Ionicons name="flash-outline" size={16} color={colors.primary} />
+                <Text style={styles.testBtnText}>Send Test Alert</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             filteredNotifications.map((item) => {
@@ -398,6 +416,24 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20
+  },
+  testBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.primary,
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 16,
+    elevation: 1
+  },
+  testBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary
   }
 });
 

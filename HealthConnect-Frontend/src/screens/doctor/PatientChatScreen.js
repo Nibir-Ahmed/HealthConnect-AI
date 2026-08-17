@@ -8,6 +8,7 @@ import colors from '../../utils/colors';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/firebase';
 import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
+import { sendNotification } from '../../services/notificationService';
 
 const getRoomId = (id1, id2) => {
   const s1 = String(id1 || '');
@@ -73,7 +74,7 @@ const PatientChatScreen = ({ route, navigation }) => {
         roomId: roomId,
         participants: [myId, patientId],
         senderId: myId,
-        senderName: user?.name || 'Dr. Fahim Ahmed',
+        senderName: user?.name || 'Doctor',
         senderAvatar: user?.avatar || '',
         receiverId: patientId,
         receiverName: patientName,
@@ -82,6 +83,20 @@ const PatientChatScreen = ({ route, navigation }) => {
         isRead: false,
         createdAt: new Date().toISOString()
       });
+
+      // Send notification to patient
+      if (patientId) {
+        await sendNotification({
+          userId: String(patientId),
+          userRole: 'patient',
+          title: `New Message from ${user?.name || 'Doctor'} 🩺`,
+          body: textToSend.length > 60 ? `${textToSend.slice(0, 57)}...` : textToSend,
+          type: 'chat',
+          route: 'DoctorChat',
+          routeParams: { doctor: { id: myId, name: user?.name || 'Doctor', avatar: user?.avatar } }
+        });
+      }
+
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (err) {
       console.error('Error sending doctor message:', err);

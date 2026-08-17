@@ -9,6 +9,7 @@ import colors from '../../utils/colors';
 import { useAuth } from '../../context/AuthContext';
 import { db } from '../../services/firebase';
 import { collection, query, where, onSnapshot, addDoc } from 'firebase/firestore';
+import { sendNotification } from '../../services/notificationService';
 
 const getRoomId = (id1, id2) => {
   const s1 = String(id1 || '');
@@ -85,6 +86,20 @@ const DoctorChatScreen = ({ route, navigation }) => {
         isRead: false,
         createdAt: new Date().toISOString()
       });
+
+      // Send live notification to doctor
+      if (doctorId) {
+        await sendNotification({
+          userId: String(doctorId),
+          userRole: 'doctor',
+          title: `New Message from ${user?.name || 'Patient'} 💬`,
+          body: textToSend.length > 60 ? `${textToSend.slice(0, 57)}...` : textToSend,
+          type: 'chat',
+          route: 'PatientChat',
+          routeParams: { patient: { id: myId, name: user?.name || 'Patient', avatar: user?.avatar } }
+        });
+      }
+
       setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
     } catch (err) {
       console.error('Error sending message:', err);
