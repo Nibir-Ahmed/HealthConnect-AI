@@ -8,11 +8,16 @@ import MyAppointmentsScreen from '../screens/patient/MyAppointmentsScreen';
 import MessagesScreen from '../screens/common/MessagesScreen';
 import ProfileScreen from '../screens/patient/ProfileScreen';
 import { Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import colors from '../utils/colors';
 
 const Tab = createBottomTabNavigator();
 
 const PatientTabs = () => {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12);
+  const tabHeight = 56 + bottomPadding;
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -23,8 +28,8 @@ const PatientTabs = () => {
           backgroundColor: colors.white,
           borderTopWidth: 1,
           borderTopColor: 'rgba(0,0,0,0.06)',
-          height: Platform.OS === 'ios' ? 84 : 66,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          height: tabHeight,
+          paddingBottom: bottomPadding,
           paddingTop: 6,
           boxShadow: '0px -2px 10px rgba(0,0,0,0.06)',
           elevation: 8

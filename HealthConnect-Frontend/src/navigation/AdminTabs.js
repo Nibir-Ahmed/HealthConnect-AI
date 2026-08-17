@@ -1,6 +1,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import DoctorVerificationScreen from '../screens/admin/DoctorVerificationScreen';
 import PatientDirectoryScreen from '../screens/admin/PatientDirectoryScreen';
@@ -11,6 +12,10 @@ import colors from '../utils/colors';
 const Tab = createBottomTabNavigator();
 
 const AdminTabs = () => {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12);
+  const tabHeight = 56 + bottomPadding;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -21,8 +26,8 @@ const AdminTabs = () => {
           backgroundColor: colors.white,
           borderTopWidth: 1,
           borderTopColor: 'rgba(0,0,0,0.06)',
-          height: Platform.OS === 'ios' ? 84 : 66,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          height: tabHeight,
+          paddingBottom: bottomPadding,
           paddingTop: 6,
           boxShadow: '0px -2px 10px rgba(0,0,0,0.06)',
           elevation: 8

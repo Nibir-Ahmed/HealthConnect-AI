@@ -143,36 +143,38 @@ const DoctorChatScreen = ({ route, navigation }) => {
         <Text style={styles.encryptedText}>This clinical chat is encrypted and fully private.</Text>
       </View>
 
-      {/* Messages */}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.messageList}
-        contentContainerStyle={styles.messageContent}
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-      >
-        {messages.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubbles-outline" size={48} color={colors.textLight} />
-            <Text style={styles.emptyText}>Start Consultation with {doctorName}</Text>
-            <Text style={styles.emptySubText}>Send a message, describe your symptoms, or share reports anytime.</Text>
-          </View>
-        ) : (
-          messages.map((item) => (
-            <ChatBubble
-              key={item.id}
-              message={item}
-              isMe={item.isMe}
-              avatar={item.isMe ? user?.avatar : doctorAvatar}
-            />
-          ))
-        )}
-      </ScrollView>
-
-      {/* Input */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
+        {/* Messages */}
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.messageList}
+          contentContainerStyle={styles.messageContent}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+        >
+          {messages.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubbles-outline" size={48} color={colors.textLight} />
+              <Text style={styles.emptyText}>Start Consultation with {doctorName}</Text>
+              <Text style={styles.emptySubText}>Send a message, describe your symptoms, or share reports anytime.</Text>
+            </View>
+          ) : (
+            messages.map((item) => (
+              <ChatBubble
+                key={item.id}
+                message={item}
+                isMe={item.isMe}
+                avatar={item.isMe ? user?.avatar : doctorAvatar}
+              />
+            ))
+          )}
+        </ScrollView>
+
+        {/* Input */}
         <View style={styles.inputContainer}>
           <TouchableOpacity 
             style={styles.attachBtn} 

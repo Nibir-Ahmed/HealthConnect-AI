@@ -5,13 +5,18 @@ import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import colors from '../../utils/colors';
-import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../services/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const DAYS_OF_WEEK = [
   'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
 ];
 
 const SetAvailabilityScreen = ({ navigation }) => {
+  const { user } = useAuth();
+  const doctorId = user?.uid || user?.id;
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [schedule, setSchedule] = useState(
@@ -25,29 +30,32 @@ const SetAvailabilityScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchAvailability();
-  }, []);
+  }, [doctorId]);
 
   const fetchAvailability = async () => {
     try {
-      const response = await api.get('/doctors/profile/me');
-      const availabilities = response.data.availabilities || [];
-      
-      const newSchedule = schedule.map(day => {
-        const found = availabilities.find(a => a.dayOfWeek === day.dayOfWeek);
-        if (found) {
-          return {
-            ...day,
-            enabled: true,
-            startTime: found.startTime.substring(0, 5), // '09:00:00' -> '09:00'
-            endTime: found.endTime.substring(0, 5)
-          };
+      if (doctorId) {
+        const docRef = doc(db, 'doctors', doctorId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const availabilities = docSnap.data().availabilities || [];
+          const newSchedule = schedule.map(day => {
+            const found = availabilities.find(a => a.dayOfWeek === day.dayOfWeek);
+            if (found) {
+              return {
+                ...day,
+                enabled: true,
+                startTime: (found.startTime || '09:00').substring(0, 5),
+                endTime: (found.endTime || '17:00').substring(0, 5)
+              };
+            }
+            return day;
+          });
+          setSchedule(newSchedule);
         }
-        return day;
-      });
-      setSchedule(newSchedule);
+      }
     } catch (error) {
-      console.error('Failed to fetch availability:', error);
-      Alert.alert('Error', 'Failed to load your current schedule.');
+      console.warn('Firestore fetch availability note:', error.message);
     } finally {
       setLoading(false);
     }
@@ -77,9 +85,12 @@ const SetAvailabilityScreen = ({ navigation }) => {
           endTime: d.endTime
         }));
 
-      await api.post('/doctors/availability', {
-        availabilities: activeAvailabilities
-      });
+      if (doctorId) {
+        await setDoc(doc(db, 'doctors', doctorId), {
+          availabilities: activeAvailabilities,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
       
       Alert.alert('Success', 'Availability schedule updated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }

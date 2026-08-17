@@ -3,14 +3,23 @@
     "name": "HealthConnect",
     "slug": "HealthConnect",
     "version": "1.0.0",
+    "scheme": "healthconnect",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.healthconnect.app"
     },
     "android": {
       "package": "com.healthconnect.app",
+      "googleServicesFile": "./google-services.json",
+      "softwareKeyboardLayoutMode": "resize",
+      "androidNavigationBar": {
+        "visible": "always",
+        "barStyle": "dark-content",
+        "backgroundColor": "#FFFFFF"
+      },
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -23,7 +32,8 @@
     },
     "plugins": [
       "expo-sharing",
-      "expo-font"
+      "expo-font",
+      "@react-native-google-signin/google-signin"
     ],
     "extra": {
       "eas": {

@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "710819612061",
+    "project_id": "healthconnect-f7fcb",
+    "storage_bucket": "healthconnect-f7fcb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:710819612061:android:697b5bebb5ba82ea48db74",
+        "android_client_info": {
+          "package_name": "com.healthconnect.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "710819612061-skip7g0l3d3og5prb5pf6jiefohgcc9a.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.healthconnect.app",
+            "certificate_hash": "3ed8a026e9379f0594e77f092eadec58f95291d9"
+          }
+        },
+        {
+          "client_id": "710819612061-s1vqlm81lqg4jmerba7u6peshoce1481.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB3bNP0_NrrdjuDBz7wbDkkFW9PqmVydTw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "710819612061-s1vqlm81lqg4jmerba7u6peshoce1481.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -136,16 +136,16 @@ const EmergencyChatScreen = ({ navigation }) => {
       </View>
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
-        enabled={Platform.OS === 'ios'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
         <View style={{ flex: 1 }}>
           <ScrollView
             ref={scrollViewRef}
             style={{ flex: 1 }}
             contentContainerStyle={styles.chatArea}
+            keyboardShouldPersistTaps="handled"
             onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
           >
             {messages.map((msg) => (

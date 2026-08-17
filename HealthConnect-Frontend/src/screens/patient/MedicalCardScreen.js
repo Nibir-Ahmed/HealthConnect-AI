@@ -16,35 +16,61 @@ import { doc, updateDoc } from 'firebase/firestore';
 const BLOOD_GROUPS = ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'];
 
 const MedicalCardScreen = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const { height: windowHeight } = useWindowDimensions();
 
-  // Edit Modal State
+  // Saved values from user profile (NO fake demo data)
+  const savedBloodType = user?.bloodType || '';
+  const savedAge = user?.age ? String(user.age) : '';
+  const savedAllergies = user?.allergies ? (Array.isArray(user.allergies) ? user.allergies.join(', ') : user.allergies) : '';
+  const savedContactName = user?.emergencyContact?.name || '';
+  const savedContactPhone = user?.emergencyContact?.phone || user?.phone || '';
+  const savedContactRelation = user?.emergencyContact?.relation || '';
+
+  // Edit Modal Draft Form State (isolated from saved state)
   const [editModalVisible, setEditModalVisible] = useState(false);
-  const [bloodType, setBloodType] = useState(user?.bloodType || 'O+');
-  const [age, setAge] = useState(user?.age ? String(user.age) : '24');
-  const [allergies, setAllergies] = useState(user?.allergies ? (Array.isArray(user.allergies) ? user.allergies.join(', ') : user.allergies) : 'Penicillin, Peanuts');
-  const [contactName, setContactName] = useState(user?.emergencyContact?.name || 'Emergency Contact');
-  const [contactPhone, setContactPhone] = useState(user?.emergencyContact?.phone || '+880 1711-000000');
-  const [contactRelation, setContactRelation] = useState(user?.emergencyContact?.relation || 'Spouse / Family');
+  const [formBloodType, setFormBloodType] = useState('');
+  const [formAge, setFormAge] = useState('');
+  const [formAllergies, setFormAllergies] = useState('');
+  const [formContactName, setFormContactName] = useState('');
+  const [formContactPhone, setFormContactPhone] = useState('');
+  const [formContactRelation, setFormContactRelation] = useState('');
   const [saving, setSaving] = useState(false);
+
+  // Open modal and load current saved data into draft form
+  const handleOpenEditModal = () => {
+    setFormBloodType(savedBloodType);
+    setFormAge(savedAge);
+    setFormAllergies(savedAllergies);
+    setFormContactName(savedContactName);
+    setFormContactPhone(savedContactPhone);
+    setFormContactRelation(savedContactRelation);
+    setEditModalVisible(true);
+  };
+
+  // Close modal without saving (discards draft changes)
+  const handleCloseModal = () => {
+    setEditModalVisible(false);
+  };
 
   const handleSaveVitals = async () => {
     try {
       setSaving(true);
-      const allergyArr = allergies.split(',').map(s => s.trim()).filter(Boolean);
+      const allergyArr = formAllergies.split(',').map(s => s.trim()).filter(Boolean);
       const updatePayload = {
-        bloodType,
-        age: age.trim(),
+        bloodType: formBloodType,
+        age: formAge.trim(),
         allergies: allergyArr,
         emergencyContact: {
-          name: contactName.trim(),
-          phone: contactPhone.trim(),
-          relation: contactRelation.trim()
+          name: formContactName.trim(),
+          phone: formContactPhone.trim(),
+          relation: formContactRelation.trim()
         }
       };
 
-      if (user?.uid || user?.id) {
+      if (updateUser) {
+        await updateUser(updatePayload);
+      } else if (user?.uid || user?.id) {
         await updateDoc(doc(db, 'users', user.uid || user.id), updatePayload);
       }
 
@@ -93,26 +119,26 @@ const MedicalCardScreen = ({ navigation }) => {
           <div class="grid">
             <div>
               <div class="item-label">BLOOD GROUP</div>
-              <p class="item-value">${bloodType}</p>
+              <p class="item-value">${savedBloodType || 'Not set'}</p>
             </div>
             <div>
               <div class="item-label">AGE</div>
-              <p class="item-value" style="color: #fff;">${age} yrs</p>
+              <p class="item-value" style="color: #fff;">${savedAge ? `${savedAge} yrs` : 'Not set'}</p>
             </div>
             <div>
-              <div class="item-label">ORGAN DONOR</div>
-              <p class="item-value" style="color: #4ade80; font-size: 16px;">YES</p>
+              <div class="item-label">STATUS</div>
+              <p class="item-value" style="color: #4ade80; font-size: 16px;">ACTIVE</p>
             </div>
           </div>
           
           <div class="footer">
             <div class="footer-section">
               <div class="item-label">CRITICAL ALLERGIES & ALERTS</div>
-              <div class="footer-value" style="color: #ffc9c9;">${allergies || 'None specified'}</div>
+              <div class="footer-value" style="color: #ffc9c9;">${savedAllergies || 'None reported'}</div>
             </div>
             <div class="footer-section">
               <div class="item-label">PRIMARY EMERGENCY CONTACT</div>
-              <div class="footer-value">${contactName} (${contactRelation}) • ${contactPhone}</div>
+              <div class="footer-value">${savedContactName ? `${savedContactName} ${savedContactRelation ? `(${savedContactRelation})` : ''} • ${savedContactPhone}` : 'Not configured'}</div>
             </div>
           </div>
         </div>
@@ -152,7 +178,7 @@ const MedicalCardScreen = ({ navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Digital Medical ID</Text>
-        <TouchableOpacity style={styles.editHeaderBtn} onPress={() => setEditModalVisible(true)}>
+        <TouchableOpacity style={styles.editHeaderBtn} onPress={handleOpenEditModal}>
           <Ionicons name="create-outline" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
@@ -182,11 +208,15 @@ const MedicalCardScreen = ({ navigation }) => {
                 <View style={styles.vitalGrid}>
                   <View style={styles.vitalItem}>
                     <Text style={styles.vitalLabel}>BLOOD GROUP</Text>
-                    <Text style={[styles.vitalValue, { color: '#ff6b6b' }]}>{bloodType}</Text>
+                    <Text style={[styles.vitalValue, { color: savedBloodType ? '#ff6b6b' : 'rgba(255,255,255,0.4)' }]}>
+                      {savedBloodType || '--'}
+                    </Text>
                   </View>
                   <View style={styles.vitalItem}>
                     <Text style={styles.vitalLabel}>AGE</Text>
-                    <Text style={styles.vitalValue}>{age} yrs</Text>
+                    <Text style={[styles.vitalValue, { color: savedAge ? colors.white : 'rgba(255,255,255,0.4)' }]}>
+                      {savedAge ? `${savedAge} yrs` : '--'}
+                    </Text>
                   </View>
                   <View style={styles.vitalItem}>
                     <Text style={styles.vitalLabel}>STATUS</Text>
@@ -202,7 +232,9 @@ const MedicalCardScreen = ({ navigation }) => {
                   <Ionicons name="warning" size={14} color="#ff6b6b" />
                   <Text style={styles.alertTitle}>CRITICAL ALLERGIES & ALERTS</Text>
                 </View>
-                <Text style={styles.alertContent}>{allergies || 'No known drug allergies'}</Text>
+                <Text style={styles.alertContent}>
+                  {savedAllergies || 'No known drug allergies reported (Tap Edit to add)'}
+                </Text>
               </View>
 
               <View style={[styles.alertBox, { marginTop: 10 }]}>
@@ -210,14 +242,18 @@ const MedicalCardScreen = ({ navigation }) => {
                   <Ionicons name="call" size={14} color="#4ade80" />
                   <Text style={[styles.alertTitle, { color: '#4ade80' }]}>PRIMARY EMERGENCY CONTACT</Text>
                 </View>
-                <Text style={styles.alertContent}>{contactName} ({contactRelation}) • {contactPhone}</Text>
+                <Text style={styles.alertContent}>
+                  {savedContactName
+                    ? `${savedContactName} ${savedContactRelation ? `(${savedContactRelation})` : ''} • ${savedContactPhone}`
+                    : 'No emergency contact set (Tap Edit to add)'}
+                </Text>
               </View>
             </View>
           </View>
 
           {/* Action Buttons */}
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionBtn} onPress={() => setEditModalVisible(true)}>
+            <TouchableOpacity style={styles.actionBtn} onPress={handleOpenEditModal}>
               <Ionicons name="pencil" size={18} color={colors.primary} />
               <Text style={styles.actionBtnText}>Edit Details</Text>
             </TouchableOpacity>
@@ -242,12 +278,12 @@ const MedicalCardScreen = ({ navigation }) => {
       </View>
 
       {/* Edit Medical ID Modal */}
-      <Modal visible={editModalVisible} animationType="slide" transparent={true}>
+      <Modal visible={editModalVisible} animationType="slide" transparent={true} onRequestClose={handleCloseModal}>
         <View style={styles.modalOverlay}>
           <View style={styles.modalContent}>
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Edit Medical ID Vitals</Text>
-              <TouchableOpacity onPress={() => setEditModalVisible(false)}>
+              <TouchableOpacity onPress={handleCloseModal}>
                 <Ionicons name="close" size={24} color={colors.textPrimary} />
               </TouchableOpacity>
             </View>
@@ -258,19 +294,19 @@ const MedicalCardScreen = ({ navigation }) => {
                 {BLOOD_GROUPS.map((bg) => (
                   <TouchableOpacity
                     key={bg}
-                    style={[styles.bloodChip, bloodType === bg && styles.bloodChipActive]}
-                    onPress={() => setBloodType(bg)}
+                    style={[styles.bloodChip, formBloodType === bg && styles.bloodChipActive]}
+                    onPress={() => setFormBloodType(formBloodType === bg ? '' : bg)}
                   >
-                    <Text style={[styles.bloodText, bloodType === bg && styles.bloodTextActive]}>{bg}</Text>
+                    <Text style={[styles.bloodText, formBloodType === bg && styles.bloodTextActive]}>{bg}</Text>
                   </TouchableOpacity>
                 ))}
               </View>
 
-              <Input label="Age" placeholder="e.g. 26" value={age} onChangeText={setAge} icon="calendar-outline" />
-              <Input label="Known Allergies" placeholder="e.g. Penicillin, Peanuts" value={allergies} onChangeText={setAllergies} icon="alert-circle-outline" />
-              <Input label="Emergency Contact Name" placeholder="e.g. Sarah Ahmed" value={contactName} onChangeText={setContactName} icon="person-outline" />
-              <Input label="Relationship" placeholder="e.g. Spouse / Sister / Parent" value={contactRelation} onChangeText={setContactRelation} icon="people-outline" />
-              <Input label="Emergency Phone" placeholder="e.g. +880 1711-000000" value={contactPhone} onChangeText={setContactPhone} icon="call-outline" />
+              <Input label="Age" placeholder="e.g. 26" value={formAge} onChangeText={setFormAge} keyboardType="numeric" icon="calendar-outline" />
+              <Input label="Known Allergies" placeholder="e.g. Dust, Penicillin (comma separated)" value={formAllergies} onChangeText={setFormAllergies} icon="alert-circle-outline" />
+              <Input label="Emergency Contact Name" placeholder="e.g. Relative / Friend Name" value={formContactName} onChangeText={setFormContactName} icon="person-outline" />
+              <Input label="Relationship" placeholder="e.g. Spouse / Parent / Sibling" value={formContactRelation} onChangeText={setFormContactRelation} icon="people-outline" />
+              <Input label="Emergency Phone" placeholder="e.g. +880 1711-XXXXXX" value={formContactPhone} onChangeText={setFormContactPhone} keyboardType="phone-pad" icon="call-outline" />
 
               <Button title="Save Medical ID" onPress={handleSaveVitals} loading={saving} style={{ marginTop: 16 }} />
             </ScrollView>

@@ -128,35 +128,37 @@ const PatientChatScreen = ({ route, navigation }) => {
       </View>
 
       {/* Messages */}
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.messageList}
-        contentContainerStyle={styles.messageContent}
-        onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
-      >
-        {messages.length === 0 ? (
-          <View style={styles.emptyContainer}>
-            <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.textLight} />
-            <Text style={styles.emptyText}>Consultation with {patientName}</Text>
-            <Text style={styles.emptySubText}>You can message this patient directly anytime. Use the buttons above to review their health vault or issue digital prescriptions.</Text>
-          </View>
-        ) : (
-          messages.map((item) => (
-            <ChatBubble
-              key={item.id}
-              message={item}
-              isMe={item.isMe}
-              avatar={item.isMe ? user?.avatar : patientAvatar}
-            />
-          ))
-        )}
-      </ScrollView>
-
-      {/* Input */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.messageList}
+          contentContainerStyle={styles.messageContent}
+          keyboardShouldPersistTaps="handled"
+          onContentSizeChange={() => scrollViewRef.current?.scrollToEnd({ animated: true })}
+        >
+          {messages.length === 0 ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons name="chatbubble-ellipses-outline" size={48} color={colors.textLight} />
+              <Text style={styles.emptyText}>Consultation with {patientName}</Text>
+              <Text style={styles.emptySubText}>You can message this patient directly anytime. Use the buttons above to review their health vault or issue digital prescriptions.</Text>
+            </View>
+          ) : (
+            messages.map((item) => (
+              <ChatBubble
+                key={item.id}
+                message={item}
+                isMe={item.isMe}
+                avatar={item.isMe ? user?.avatar : patientAvatar}
+              />
+            ))
+          )}
+        </ScrollView>
+
+        {/* Input */}
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}

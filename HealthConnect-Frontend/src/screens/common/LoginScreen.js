@@ -8,7 +8,8 @@ import Button from '../../components/Button';
 import colors from '../../utils/colors';
 import { Ionicons } from '@expo/vector-icons';
 import { auth } from '../../services/firebase';
-import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult } from 'firebase/auth';
+import { GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithCredential } from 'firebase/auth';
+import { GoogleSignin } from '@react-native-google-signin/google-signin';
 const LoginScreen = ({ route, navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
   const { login, googleLogin } = useAuth();
@@ -17,6 +18,16 @@ const LoginScreen = ({ route, navigation }) => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Configure Google Sign-In for mobile
+  useEffect(() => {
+    if (Platform.OS !== 'web') {
+      GoogleSignin.configure({
+        webClientId: '710819612061-s1vqlm81lqg4jmerba7u6peshoce1481.apps.googleusercontent.com',
+      });
+    }
+  }, []);
+
   useEffect(() => {
     if (Platform.OS === 'web') {
       const checkRedirect = async () => {
@@ -78,9 +89,21 @@ const LoginScreen = ({ route, navigation }) => {
           await signInWithRedirect(auth, provider);
         }
       } else {
+        // Native mobile Google Sign-In
         try {
-          const result = await signInWithPopup(auth, provider);
-          const user = result.user;
+          await GoogleSignin.hasPlayServices();
+          const response = await GoogleSignin.signIn();
+          const idToken = response.data?.idToken;
+
+          if (!idToken) {
+            throw new Error('Failed to get ID token from Google Sign-In');
+          }
+
+          // Create Firebase credential from native Google token
+          const credential = GoogleAuthProvider.credential(idToken);
+          const userCredential = await signInWithCredential(auth, credential);
+          const user = userCredential.user;
+
           const googleUserData = {
             uid: user.uid,
             email: user.email,
@@ -93,9 +116,10 @@ const LoginScreen = ({ route, navigation }) => {
             setError(loginResult.message);
           }
         } catch (mobileError) {
-          console.log('Mobile Google Sign-In redirect fallback...', mobileError);
-          await AsyncStorage.setItem('pendingGoogleLoginRole', role);
-          await signInWithRedirect(auth, provider);
+          console.error('Native Google Sign-In Error:', mobileError);
+          if (mobileError.code !== 'SIGN_IN_CANCELLED') {
+            setError(mobileError.message || 'Google Sign-In failed');
+          }
         }
       }
     } catch (error) {

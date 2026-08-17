@@ -2,6 +2,7 @@ import React from 'react';
 import { Platform } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import DoctorHomeScreen from '../screens/doctor/DoctorHomeScreen';
 import DoctorAppointmentsScreen from '../screens/doctor/DoctorAppointmentsScreen';
 import DoctorProfileSettingsScreen from '../screens/doctor/DoctorProfileSettingsScreen';
@@ -12,6 +13,10 @@ import colors from '../utils/colors';
 const Tab = createBottomTabNavigator();
 
 const DoctorTabs = () => {
+  const insets = useSafeAreaInsets();
+  const bottomPadding = Math.max(insets.bottom, Platform.OS === 'ios' ? 24 : 12);
+  const tabHeight = 56 + bottomPadding;
+
   return (
     <Tab.Navigator
       screenOptions={{
@@ -22,8 +27,8 @@ const DoctorTabs = () => {
           backgroundColor: colors.white,
           borderTopWidth: 1,
           borderTopColor: 'rgba(0,0,0,0.06)',
-          height: Platform.OS === 'ios' ? 84 : 66,
-          paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+          height: tabHeight,
+          paddingBottom: bottomPadding,
           paddingTop: 6,
           boxShadow: '0px -2px 10px rgba(0,0,0,0.06)',
           elevation: 8

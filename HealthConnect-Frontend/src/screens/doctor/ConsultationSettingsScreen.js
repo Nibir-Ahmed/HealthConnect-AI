@@ -5,9 +5,14 @@ import { Ionicons } from '@expo/vector-icons';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import colors from '../../utils/colors';
-import api from '../../services/api';
+import { useAuth } from '../../context/AuthContext';
+import { db } from '../../services/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 const ConsultationSettingsScreen = ({ navigation }) => {
+  const { user } = useAuth();
+  const doctorId = user?.uid || user?.id;
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -21,22 +26,25 @@ const ConsultationSettingsScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchProfile();
-  }, []);
+  }, [doctorId]);
 
   const fetchProfile = async () => {
     try {
-      const response = await api.get('/doctors/profile/me');
-      const data = response.data;
-      
-      setSpecialty(data.specialty || '');
-      setUniversity(data.university || '');
-      setLicenseNumber(data.licenseNumber || '');
-      setExperience(data.experience ? data.experience.toString() : '');
-      setBio(data.bio || '');
-      setConsultationFee(data.consultationFee ? data.consultationFee.toString() : '');
+      if (doctorId) {
+        const docRef = doc(db, 'doctors', doctorId);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          setSpecialty(data.specialty || '');
+          setUniversity(data.university || '');
+          setLicenseNumber(data.licenseNumber || '');
+          setExperience(data.experience ? String(data.experience) : '');
+          setBio(data.bio || '');
+          setConsultationFee(data.consultationFee ? String(data.consultationFee) : '');
+        }
+      }
     } catch (error) {
-      console.error('Failed to fetch doctor profile:', error);
-      Alert.alert('Error', 'Failed to load profile details.');
+      console.warn('Firestore fetch doctor profile note:', error.message);
     } finally {
       setLoading(false);
     }
@@ -45,21 +53,26 @@ const ConsultationSettingsScreen = ({ navigation }) => {
   const handleSave = async () => {
     try {
       setSaving(true);
-      await api.put('/doctors/profile', {
+      const updateData = {
         specialty,
         university,
         licenseNumber,
         experience: parseInt(experience, 10) || 0,
         bio,
-        consultationFee: parseFloat(consultationFee) || 0
-      });
+        consultationFee: parseFloat(consultationFee) || 0,
+        updatedAt: new Date().toISOString()
+      };
+
+      if (doctorId) {
+        await setDoc(doc(db, 'doctors', doctorId), updateData, { merge: true });
+      }
       
       Alert.alert('Success', 'Profile settings updated successfully!', [
         { text: 'OK', onPress: () => navigation.goBack() }
       ]);
     } catch (error) {
-      console.error('Failed to update profile:', error);
-      Alert.alert('Error', 'Could not save profile settings.');
+      console.error('Failed to update doctor profile:', error);
+      Alert.alert('Error', 'Failed to update profile settings.');
     } finally {
       setSaving(false);
     }
