@@ -66,7 +66,7 @@ const ProfileScreen = ({ navigation }) => {
 
             <View style={styles.divider} />
 
-            <TouchableOpacity style={styles.optionRow}>
+            <TouchableOpacity style={styles.optionRow} onPress={() => navigation.navigate('Notifications')}>
               <View style={styles.optionLeft}>
                 <View style={[styles.iconCircle, { backgroundColor: 'rgba(59, 130, 246, 0.1)' }]}>
                   <Ionicons name="notifications-outline" size={20} color="#3B82F6" />

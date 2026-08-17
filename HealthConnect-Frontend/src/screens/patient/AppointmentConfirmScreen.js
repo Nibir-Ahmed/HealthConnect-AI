@@ -10,6 +10,7 @@ import api from '../../services/api';
 import { db } from '../../services/firebase';
 import { collection, addDoc } from 'firebase/firestore';
 import { useAuth } from '../../context/AuthContext';
+import { sendNotification } from '../../services/notificationService';
 
 const AppointmentConfirmScreen = ({ route, navigation }) => {
   const { user } = useAuth();
@@ -48,6 +49,27 @@ const AppointmentConfirmScreen = ({ route, navigation }) => {
       };
 
       await addDoc(collection(db, 'appointments'), apptData);
+
+      // Trigger instant notifications for both patient and doctor
+      await sendNotification({
+        userId: user?.id || user?.uid,
+        title: 'Appointment Booked! 📅',
+        body: `Your consultation with ${doctor.User?.name || doctor.name || 'Doctor'} is confirmed for ${displayDate} at ${time}.`,
+        type: 'appointment',
+        route: 'MyAppointments'
+      });
+
+      if (doctor.id) {
+        await sendNotification({
+          userId: String(doctor.id),
+          userRole: 'doctor',
+          title: 'New Consultation Request 🩺',
+          body: `${user?.name || 'A patient'} has booked a consultation for ${displayDate} at ${time}.`,
+          type: 'appointment',
+          route: 'IncomingRequest'
+        });
+      }
+
       setIsConfirmed(true);
     } catch (error) {
       console.error('Booking error in Firestore:', error);

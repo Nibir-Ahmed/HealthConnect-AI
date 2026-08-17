@@ -13,6 +13,7 @@ import AdminTabs from './AdminTabs';
 // Common Screens
 import MaintenanceScreen from '../screens/common/MaintenanceScreen';
 import HelpSupportScreen from '../screens/common/HelpSupportScreen';
+import NotificationScreen from '../screens/common/NotificationScreen';
 
 // Patient Screens
 import HomeScreen from '../screens/patient/HomeScreen';
@@ -140,6 +141,7 @@ const AppNavigator = () => {
       <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} options={{ headerShown: false }} />
       <Stack.Screen name="Profile" component={ProfileScreen} />
       <Stack.Screen name="HelpSupport" component={HelpSupportScreen} />
+      <Stack.Screen name="Notifications" component={NotificationScreen} />
 
       {/* Doctor Screens */}
       <Stack.Screen name="IncomingRequest" component={IncomingRequestScreen} options={{ headerShown: false }} />

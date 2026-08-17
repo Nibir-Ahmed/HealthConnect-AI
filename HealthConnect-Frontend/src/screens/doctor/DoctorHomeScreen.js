@@ -8,6 +8,7 @@ import Card from '../../components/Card';
 import colors from '../../utils/colors';
 import { db } from '../../services/firebase';
 import { collection, onSnapshot, query, where, doc, updateDoc } from 'firebase/firestore';
+import { subscribeUserNotifications } from '../../services/notificationService';
 
 const DoctorHomeScreen = ({ navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
@@ -16,6 +17,18 @@ const DoctorHomeScreen = ({ navigation }) => {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
+
+  useEffect(() => {
+    // Live notifications subscription for doctor
+    if (!user) return;
+    const unsubNotifs = subscribeUserNotifications(user?.id || user?.uid, user?.role, (data) => {
+      const count = (data || []).filter(n => !n.read).length;
+      setUnreadNotifications(count);
+    });
+
+    return () => unsubNotifs();
+  }, [user]);
 
   useEffect(() => {
     // Live Firestore appointments subscription
@@ -80,7 +93,25 @@ const DoctorHomeScreen = ({ navigation }) => {
           </Text>
           <Text style={styles.subtitle}>{user?.specialty || 'General Practitioner'} • Active</Text>
         </View>
-        <Avatar uri={user?.avatar} name={user?.name || 'Doctor'} size={48} online={true} />
+        <View style={styles.headerRight}>
+          <TouchableOpacity 
+            style={styles.notificationBellBtn} 
+            onPress={() => navigation.navigate('Notifications')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
+            {unreadNotifications > 0 ? (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>
+                  {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                </Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('DoctorProfileSettings')}>
+            <Avatar uri={user?.avatar} name={user?.name || 'Doctor'} size={44} online={true} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={{ flex: 1 }}>
@@ -514,6 +545,39 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: colors.textSecondary,
     marginTop: 2
+  },
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  notificationBellBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative'
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: colors.emergency,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: colors.white
+  },
+  bellBadgeText: {
+    color: colors.white,
+    fontSize: 9,
+    fontWeight: '800'
   }
 });
 

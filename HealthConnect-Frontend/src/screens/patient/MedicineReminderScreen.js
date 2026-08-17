@@ -6,6 +6,9 @@ import MedicineCard from '../../components/MedicineCard';
 import Input from '../../components/Input';
 import Button from '../../components/Button';
 import colors from '../../utils/colors';
+import { useAuth } from '../../context/AuthContext';
+import { sendNotification } from '../../services/notificationService';
+
 const INITIAL_REMINDERS = [
   { id: '1', name: 'Metformin 500mg', dosage: '1 Tablet', frequency: 'After meals', time: '08:30 AM', isActive: true, colorIndex: 0 },
   { id: '2', name: 'Atorvastatin 10mg', dosage: '1 Tablet', frequency: 'At bedtime', time: '10:00 PM', isActive: true, colorIndex: 1 },
@@ -13,6 +16,7 @@ const INITIAL_REMINDERS = [
 ];
 const MedicineReminderScreen = ({ navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
+  const { user } = useAuth();
   const [reminders, setReminders] = useState(INITIAL_REMINDERS);
   const [isAdding, setIsAdding] = useState(false);
   const [name, setName] = useState('');
@@ -28,7 +32,7 @@ const MedicineReminderScreen = ({ navigation }) => {
     setReminders((prev) => prev.filter((item) => item.id !== id));
   };
 
-  const handleAdd = () => {
+  const handleAdd = async () => {
     if (!name || !dosage || !time || !frequency) {
       Alert.alert('Form Error', 'Please complete all fields to set a reminder.');
       return;
@@ -43,12 +47,22 @@ const MedicineReminderScreen = ({ navigation }) => {
       colorIndex: reminders.length
     };
     setReminders((prev) => [...prev, newReminder]);
+
+    // Send in-app notification
+    await sendNotification({
+      userId: user?.id || user?.uid,
+      title: 'Medicine Reminder Set! 💊',
+      body: `Reminder active for ${name} (${dosage}) - ${frequency} at ${time}.`,
+      type: 'medicine',
+      route: 'MedicineReminder'
+    });
+
     setName('');
     setDosage('');
     setTime('');
     setFrequency('');
     setIsAdding(false);
-    Alert.alert('Success', 'Reminder added successfully!');
+    Alert.alert('Success', 'Reminder added and scheduled successfully!');
   };
   return (
     <SafeAreaView style={styles.container}>

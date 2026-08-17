@@ -10,6 +10,7 @@ import { getBlogCoverSource } from '../../utils/blogAssets';
 import colors from '../../utils/colors';
 import { db } from '../../services/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { subscribeUserNotifications } from '../../services/notificationService';
 
 const FEATURES = [
   { label: 'HealthConnect AI', icon: 'chatbubble-ellipses-outline', route: 'EmergencyChat', color: colors.emergencyFaded, iconColor: colors.emergency },
@@ -28,6 +29,7 @@ const HomeScreen = ({ navigation }) => {
   const { user } = useAuth();
   const [blogs, setBlogs] = useState([]);
   const [announcement, setAnnouncement] = useState(null);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
 
   useEffect(() => {
     const unsubscribe = subscribeBlogs((data) => {
@@ -35,6 +37,21 @@ const HomeScreen = ({ navigation }) => {
     });
     return () => unsubscribe();
   }, []);
+
+  useEffect(() => {
+    // Listen to real-time notifications for unread badge
+    if (!user) return;
+    const unsubNotifs = onSnapshot(doc(db, 'system_config', 'global'), () => {});
+    const unsubUserNotifs = subscribeUserNotifications(user?.id || user?.uid, user?.role, (data) => {
+      const count = (data || []).filter(n => !n.read).length;
+      setUnreadNotifications(count);
+    });
+
+    return () => {
+      unsubNotifs();
+      unsubUserNotifs();
+    };
+  }, [user]);
 
   useEffect(() => {
     // Listen to live system broadcast announcements from Admin
@@ -72,9 +89,26 @@ const HomeScreen = ({ navigation }) => {
           <Text style={styles.welcomeText}>Hi, {user?.name ? user.name.split(' ')[0] : 'There'}</Text>
           <Text style={styles.subWelcome}>How are you feeling today?</Text>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
-          <Avatar uri={user?.avatar} name={user?.name || 'User'} size={48} />
-        </TouchableOpacity>
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity 
+            style={styles.notificationBellBtn} 
+            onPress={() => navigation.navigate('Notifications')}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="notifications-outline" size={22} color={colors.textPrimary} />
+            {unreadNotifications > 0 ? (
+              <View style={styles.bellBadge}>
+                <Text style={styles.bellBadgeText}>
+                  {unreadNotifications > 9 ? '9+' : unreadNotifications}
+                </Text>
+              </View>
+            ) : null}
+          </TouchableOpacity>
+
+          <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+            <Avatar uri={user?.avatar} name={user?.name || 'User'} size={44} />
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
@@ -187,6 +221,39 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textSecondary,
     marginTop: 2
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12
+  },
+  notificationBellBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative'
+  },
+  bellBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: colors.emergency,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 3,
+    borderWidth: 1.5,
+    borderColor: colors.white
+  },
+  bellBadgeText: {
+    color: colors.white,
+    fontSize: 9,
+    fontWeight: '800'
   },
   scrollContainer: {
     paddingHorizontal: 20,
