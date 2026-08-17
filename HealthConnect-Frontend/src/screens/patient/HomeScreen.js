@@ -8,6 +8,8 @@ import Card from '../../components/Card';
 import { getBlogs, subscribeBlogs } from '../../services/blogsApi';
 import { getBlogCoverSource } from '../../utils/blogAssets';
 import colors from '../../utils/colors';
+import { db } from '../../services/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 
 const FEATURES = [
   { label: 'HealthConnect AI', icon: 'chatbubble-ellipses-outline', route: 'EmergencyChat', color: colors.emergencyFaded, iconColor: colors.emergency },
@@ -25,12 +27,29 @@ const HomeScreen = ({ navigation }) => {
   const { height: windowHeight } = useWindowDimensions();
   const { user } = useAuth();
   const [blogs, setBlogs] = useState([]);
+  const [announcement, setAnnouncement] = useState(null);
 
   useEffect(() => {
     const unsubscribe = subscribeBlogs((data) => {
       setBlogs(data || []);
     });
     return () => unsubscribe();
+  }, []);
+
+  useEffect(() => {
+    // Listen to live system broadcast announcements from Admin
+    const unsubConfig = onSnapshot(doc(db, 'system_config', 'global'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        if (data.announcement && data.announcement.active && data.announcement.text) {
+          setAnnouncement(data.announcement.text);
+        } else {
+          setAnnouncement(null);
+        }
+      }
+    }, (err) => console.warn('Config snapshot error:', err.message));
+
+    return () => unsubConfig();
   }, []);
   const getImageUrl = (url) => {
     if (!url) return null;
@@ -59,9 +78,22 @@ const HomeScreen = ({ navigation }) => {
       </View>
       <View style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false} style={{ flex: 1 }}>
-        {/* SOS Card */}
-        <TouchableOpacity
-          style={styles.sosCard}
+          {/* Live Admin Announcement Broadcast Banner */}
+          {announcement ? (
+            <View style={styles.broadcastBanner}>
+              <View style={styles.broadcastIconBox}>
+                <Ionicons name="megaphone" size={18} color="#D97706" />
+              </View>
+              <View style={styles.broadcastTextBox}>
+                <Text style={styles.broadcastTag}>OFFICIAL ANNOUNCEMENT</Text>
+                <Text style={styles.broadcastContent}>{announcement}</Text>
+              </View>
+            </View>
+          ) : null}
+
+          {/* SOS Card */}
+          <TouchableOpacity
+            style={styles.sosCard}
           activeOpacity={0.9}
           onPress={() => navigation.navigate('MainTabs', { screen: 'Emergency' })}
         >
@@ -313,6 +345,43 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     marginTop: 2
+  },
+  broadcastBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEF3C7',
+    borderWidth: 1,
+    borderColor: '#FCD34D',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 16,
+    gap: 12,
+    boxShadow: '0px 2px 6px rgba(245, 158, 11, 0.15)',
+    elevation: 2
+  },
+  broadcastIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#FDE68A',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  broadcastTextBox: {
+    flex: 1
+  },
+  broadcastTag: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#B45309',
+    letterSpacing: 0.6,
+    marginBottom: 2
+  },
+  broadcastContent: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#78350F',
+    lineHeight: 18
   }
 });
 export default HomeScreen;

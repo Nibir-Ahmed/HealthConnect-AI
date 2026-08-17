@@ -44,10 +44,36 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      const userCredential = await signInWithEmailAndPassword(auth, email, password);
+      let userCredential;
+      try {
+        userCredential = await signInWithEmailAndPassword(auth, email, password);
+      } catch (authError) {
+        // Auto-bootstrap default Master Admin if not yet created in Firebase Auth
+        if (email.trim().toLowerCase() === 'admin@healthconnect.com' && password === '123456') {
+          userCredential = await createUserWithEmailAndPassword(auth, email, password);
+          const adminProfile = {
+            name: 'Master Admin',
+            email: 'admin@healthconnect.com',
+            role: 'admin',
+            avatar: 'https://ui-avatars.com/api/?name=MA&background=F59E0B&color=fff&bold=true&length=2',
+            createdAt: new Date().toISOString()
+          };
+          await setDoc(doc(db, 'users', userCredential.user.uid), adminProfile);
+        } else {
+          throw authError;
+        }
+      }
+
       const firebaseUser = userCredential.user;
       const userDoc = await getDoc(doc(db, 'users', firebaseUser.uid));
-      const userData = userDoc.exists() ? userDoc.data() : { email, role: 'patient' };
+      let userData = userDoc.exists() ? userDoc.data() : { email, role: 'patient' };
+
+      // Ensure admin role for master admin account
+      if (email.trim().toLowerCase() === 'admin@healthconnect.com' && userData.role !== 'admin') {
+        userData.role = 'admin';
+        await setDoc(doc(db, 'users', firebaseUser.uid), { role: 'admin' }, { merge: true });
+      }
+
       setUser({ id: firebaseUser.uid, uid: firebaseUser.uid, ...userData });
       return { success: true };
     } catch (error) {
@@ -65,9 +91,16 @@ export const AuthProvider = ({ children }) => {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
 
+      const cleanName = name || 'User';
+      const nameParts = cleanName.trim().split(/\s+/).filter(Boolean);
+      const initials = nameParts.length > 1
+        ? (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase()
+        : cleanName.slice(0, 2).toUpperCase();
+
       const profileData = {
-        name: name || 'User',
+        name: cleanName,
         email: email,
+        avatar: userData.avatar || `https://ui-avatars.com/api/?name=${encodeURIComponent(initials)}&background=00A896&color=fff&bold=true&length=2`,
         role: role || 'patient',
         createdAt: new Date().toISOString()
       };
@@ -96,8 +129,24 @@ export const AuthProvider = ({ children }) => {
   const googleLogin = async (googleUserData) => {
     try {
       const { uid, email, name, avatar, role } = googleUserData;
+
+      // Admin accounts are strictly forbidden from Google Sign-In
+      if (role === 'admin') {
+        return {
+          success: false,
+          message: 'Admin accounts can only log in using Email and Password.'
+        };
+      }
+
       const userRef = doc(db, 'users', uid);
       const userSnap = await getDoc(userRef);
+
+      if (userSnap.exists() && userSnap.data()?.role === 'admin') {
+        return {
+          success: false,
+          message: 'Admin accounts can only log in using Email and Password.'
+        };
+      }
       
       let profileData = {
         name: name || 'Google User',

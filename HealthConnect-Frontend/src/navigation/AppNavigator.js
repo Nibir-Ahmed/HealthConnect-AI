@@ -1,12 +1,17 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { useAuth } from '../context/AuthContext';
+import { db } from '../services/firebase';
+import { doc, onSnapshot, getDoc } from 'firebase/firestore';
 
 // Navigators
 import AuthNavigator from './AuthNavigator';
 import PatientTabs from './PatientTabs';
 import DoctorTabs from './DoctorTabs';
 import AdminTabs from './AdminTabs';
+
+// Common Screens
+import MaintenanceScreen from '../screens/common/MaintenanceScreen';
 
 // Patient Screens
 import HomeScreen from '../screens/patient/HomeScreen';
@@ -50,6 +55,47 @@ const Stack = createStackNavigator();
 
 const AppNavigator = () => {
   const { user } = useAuth();
+  const [maintenanceMode, setMaintenanceMode] = useState(false);
+  const [emergencyPhone, setEmergencyPhone] = useState('911');
+  const [showAdminLogin, setShowAdminLogin] = useState(false);
+
+  useEffect(() => {
+    // Listen to real-time system configuration (maintenance mode & emergency contact)
+    const unsub = onSnapshot(doc(db, 'system_config', 'global'), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setMaintenanceMode(!!data.maintenanceMode);
+        if (data.emergencyPhone) setEmergencyPhone(data.emergencyPhone);
+      }
+    }, (err) => console.warn('Maintenance listener note:', err.message));
+
+    return () => unsub();
+  }, []);
+
+  const handleCheckStatus = async () => {
+    try {
+      const docSnap = await getDoc(doc(db, 'system_config', 'global'));
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setMaintenanceMode(!!data.maintenanceMode);
+      }
+    } catch (e) {
+      console.warn('Status check failed:', e);
+    }
+  };
+
+  // If maintenance mode is active, block non-admin users
+  const isBlockedByMaintenance = maintenanceMode && user?.role !== 'admin';
+
+  if (isBlockedByMaintenance && !showAdminLogin) {
+    return (
+      <MaintenanceScreen 
+        emergencyPhone={emergencyPhone} 
+        onCheckStatus={handleCheckStatus}
+        onAdminLogin={() => setShowAdminLogin(true)}
+      />
+    );
+  }
 
   if (!user) {
     return <AuthNavigator />;

@@ -61,6 +61,10 @@ const LoginScreen = ({ route, navigation }) => {
   }, []);
 
   const handleGoogleLogin = async () => {
+    if (role === 'admin') {
+      setError('Admin accounts can only log in using Email and Password.');
+      return;
+    }
     setError('');
     setLoading(true);
     try {
@@ -157,9 +161,8 @@ const LoginScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
-        enabled={Platform.OS === 'ios'}
       >
         <ScrollView style={{ flex: 1 }} contentContainerStyle={styles.scrollContainer} keyboardShouldPersistTaps="handled">
             <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
@@ -205,25 +208,39 @@ const LoginScreen = ({ route, navigation }) => {
               style={[styles.loginBtn, { backgroundColor: getRoleColor() }]}
               disabled={loading}
             />
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>OR</Text>
-              <View style={styles.dividerLine} />
-            </View>
-            <TouchableOpacity 
-              style={styles.googleBtn} 
-              onPress={handleGoogleLogin}
-              disabled={loading}
-            >
-              <Ionicons name="logo-google" size={20} color={colors.textPrimary} style={styles.googleIcon} />
-              <Text style={styles.googleBtnText}>Continue with Google</Text>
-            </TouchableOpacity>
-            <View style={styles.registerRow}>
-              <Text style={styles.registerText}>Don't have an account? </Text>
-              <TouchableOpacity onPress={() => navigation.navigate('Register', { role })}>
-                <Text style={[styles.registerLink, { color: getRoleColor() }]}>Sign Up</Text>
-              </TouchableOpacity>
-            </View>
+            
+            {/* Google login is enabled ONLY for patients and doctors, NOT for admin */}
+            {role !== 'admin' ? (
+              <>
+                <View style={styles.dividerRow}>
+                  <View style={styles.dividerLine} />
+                  <Text style={styles.dividerText}>OR</Text>
+                  <View style={styles.dividerLine} />
+                </View>
+                <TouchableOpacity 
+                  style={styles.googleBtn} 
+                  onPress={handleGoogleLogin}
+                  disabled={loading}
+                >
+                  <Ionicons name="logo-google" size={20} color={colors.textPrimary} style={styles.googleIcon} />
+                  <Text style={styles.googleBtnText}>Continue with Google</Text>
+                </TouchableOpacity>
+
+                <View style={styles.registerRow}>
+                  <Text style={styles.registerText}>Don't have an account? </Text>
+                  <TouchableOpacity onPress={() => navigation.navigate('Register', { role })}>
+                    <Text style={[styles.registerLink, { color: getRoleColor() }]}>Sign Up</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <View style={styles.adminSecurityNote}>
+                <Ionicons name="shield-checkmark" size={16} color={colors.warning} />
+                <Text style={styles.adminSecurityText}>
+                  Restricted Portal • Authorized Admin Credentials Only
+                </Text>
+              </View>
+            )}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
@@ -342,6 +359,24 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
     color: colors.textPrimary
+  },
+  adminSecurityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginTop: 8
+  },
+  adminSecurityText: {
+    fontSize: 12.5,
+    fontWeight: '600',
+    color: colors.textSecondary
   }
 });
 export default LoginScreen;
