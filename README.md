@@ -1,50 +1,58 @@
 # HealthConnect 🏥🤖
 > **AI-Powered Telemedicine & Real-time Emergency Triage Platform**
 
-HealthConnect is an open-source, full-stack cross-platform healthcare application built for **Patients**, **Doctors**, and **Administrators**. Powered by **React Native (Expo)**, **Node.js (Express)**, **Socket.io**, **Firebase**, and **GROQ LLM Engine**, HealthConnect provides real-time doctor consultations, medical vault management, and an intelligent **Banglish & English AI Assistant** for instant preliminary health triage.
+HealthConnect is a modern, full-stack cross-platform healthcare application engineered for **Patients**, **Doctors**, and **Administrators**. Built with **React Native (Expo v57)** and powered by **Cloud Firestore** and **Firebase Authentication**, HealthConnect delivers real-time clinical consultations, digital health records management, doctor verification, and an intelligent **Banglish & English AI Assistant** for instant preliminary health triage and emergency guidance.
 
 ---
 
 ## 🌟 Key Features
 
-### 🤖 1. AI Banglish Health Assistant
-- **Multilingual Symptom Triage**: Accepts symptoms in **Banglish**, English, or Bangla (e.g., *"Amar 2 din dhore matha batha r jor"*).
-- **Severity Assessment**: Categorizes triage level (`normal`, `warning`, `emergency`).
-- **Dynamic Follow-Up Prompts**: Generates contextual follow-up questions for accurate preliminary advice.
+### 🤖 1. AI Banglish Health Assistant & Emergency Triage
+- **Multilingual Symptom Triage**: Accepts clinical symptom descriptions in **Banglish**, **English**, and **Bangla** (e.g., *"Amar 2 din dhore matha batha r jor"*).
+- **Severity Detection & SOS Protocol**: Automatically flags critical symptoms (chest pain, shortness of breath, severe bleeding) and renders an emergency SOS banner with one-tap emergency calling (`999`).
+- **Dynamic Contextual Prompts**: Generates smart, interactive follow-up prompt chips guiding patients to actionable clinical steps.
 
-### 👨‍⚕️ 2. Doctor Directory & Appointments
-- **Specialty Filter**: Browse doctors by specialty (Cardiologist, Pediatrician, Dermatologist, etc.).
-- **Slot Availability**: Select available slots and confirm appointments seamlessly.
-- **Booking Management**: View past, upcoming, and canceled appointment status.
+### 👨‍⚕️ 2. Doctor Directory & Instant Appointments
+- **Specialty-Based Discovery**: Search and filter verified doctors by specialty (Cardiology, Dermatology, Pediatrics, General Medicine, etc.).
+- **Real-Time Booking**: Interactive slot selection, live booking confirmations, and appointment tracking (Upcoming, Completed, Cancelled).
+- **Ratings & Reviews**: View verified doctor ratings, experience years, and consultation fees.
 
-### 💬 3. Real-Time Consultation & Chat
-- **Dual Chat Sync**: Real-time communication via **Socket.io** and **Firebase Firestore**.
-- **Attachment Sharing**: Share medical records, prescriptions, and health vault PDFs directly inside chat bubbles.
+### 💬 3. Real-Time Tele-Consultation & Clinical Chat
+- **Instant Synchronization**: Real-time two-way messaging powered by **Cloud Firestore** `onSnapshot` subscriptions.
+- **Health Vault Sharing**: Directly select and send PDF medical reports, lab results, and prescriptions inside the chat stream.
+- **Encrypted & Private**: Secure communication channel with distinct UI styling for patients and doctors.
 
-### 📂 4. Digital Health Vault & Tools
-- **Health Records Vault**: Upload, view, and share medical reports.
-- **BMI Calculator**: Calculate Body Mass Index with tailored health tips.
-- **Medicine Reminders**: Track daily medication schedules.
-- **Medical Card**: Digital patient emergency profile card.
+### 📂 4. Digital Health Vault & Patient Tools
+- **Health Records Vault**: Upload, categorize, and securely manage personal medical documents and prescriptions.
+- **Emergency Medical Card**: Digital patient profile with blood group, emergency contacts, and allergies, exportable to PDF via `expo-print`.
+- **BMI Calculator**: Interactive Body Mass Index calculator with customized lifestyle and dietary tips.
+- **Medicine Reminders**: Track and schedule daily medication regimens.
+- **Nearest Hospital Finder**: GPS-assisted geolocation to locate nearby healthcare facilities via `expo-location`.
 
-### 🛡️ 5. Master Admin Portal
-- **Doctor Verification**: Review and approve doctor license credentials.
-- **Health Article Editor**: Publish and manage blog articles in the Health Article Library.
-- **User Directory**: Platform-wide user management.
+### 🛡️ 5. Master Admin Control Center
+- **Live Database Telemetry**: Real-time counters for active patients, doctors, appointments, and pending reviews.
+- **Doctor Credential Verification**: Review doctor licenses and credentials with one-tap approval/rejection.
+- **User & Role Management**: Seamlessly manage platform users and elevate or adjust roles.
+- **Health Article Editor**: Write, edit, and publish rich medical blogs to the community feed.
+- **System Maintenance & Announcement Engine**: Remotely toggle platform maintenance mode or broadcast global banners in real-time.
 
 ---
 
-## 🛠️ Tech Stack
+## 🛠️ Complete Tech Stack
 
-| Layer | Technology |
-| :--- | :--- |
-| **Frontend Mobile / Web** | React Native (Expo v57), React Navigation 7, Expo Vector Icons |
-| **Backend REST API** | Node.js, Express.js 5 |
-| **Real-time Messaging** | Socket.io 4, Firebase Firestore |
-| **Database & ORM** | Sequelize (SQLite / MySQL) |
-| **Authentication** | Firebase Auth (Patient / Doctor / Admin) |
-| **AI LLM Engine** | GROQ SDK (`llama-3.3-70b-versatile`) |
-| **File Storage** | Multer Local Uploads & Static Express Server |
+| Layer | Technology | Purpose |
+| :--- | :--- | :--- |
+| **Framework** | React Native (0.86.2), React (19.2.3) | Core cross-platform UI framework |
+| **Tooling & Platform** | Expo (v57.0.12) | Managed workflow, build toolchain & runtime |
+| **Navigation** | React Navigation 7 (Stack & Bottom Tabs) | Role-based navigation with deep-linking support |
+| **Backend as a Service** | Firebase v12.16.0 | Serverless infrastructure |
+| **Authentication** | Firebase Auth + Google Sign-In SDK | Email/Password auth + Google OAuth 2.0 |
+| **Database** | Cloud Firestore | Real-time NoSQL document database |
+| **Storage** | Firebase Cloud Storage | Medical reports and asset storage |
+| **Icons & Design** | `@expo/vector-icons` (Ionicons) | Unified icon set and design token palette |
+| **Document Tools** | `expo-print` & `expo-sharing` | PDF rendering, printing, and file sharing |
+| **Location Services** | `expo-location` | Geolocation for nearest hospital lookup |
+| **Markdown Engine** | `react-native-markdown-display` | Rich markdown parsing in AI clinical triage |
 
 ---
 
@@ -52,27 +60,100 @@ HealthConnect is an open-source, full-stack cross-platform healthcare applicatio
 
 ```
 HealthConnect/
-├── HealthConnect-Backend/        # Express REST API & Socket server
-│   ├── src/
-│   │   ├── config/               # Database connection & Sequelize models
-│   │   ├── controllers/          # Auth, AI Triage, Doctors, Appointments, Chat logic
-│   │   ├── middleware/           # JWT & File upload middlewares
-│   │   ├── models/               # User, Doctor, Appointment, Blog Sequelize models
-│   │   ├── routes/               # Express API routes
-│   │   └── index.js              # Server entry point
-│   ├── uploads/                  # Uploaded medical records & blog cover images
-│   └── .env.example              # Environment variables template
-│
-└── HealthConnect-Frontend/       # Expo React Native App (Android, iOS, Web)
-    ├── assets/                   # App icons, splash screens, and avatars
-    ├── src/
-    │   ├── components/           # Reusable UI components (Avatar, DoctorCard, ChatBubble)
-    │   ├── context/              # AuthContext for Firebase & JWT auth state
-    │   ├── navigation/           # AppNavigator, PatientTabs, DoctorTabs, AdminTabs
-    │   ├── screens/              # Patient, Doctor, Admin, and Common screens
-    │   ├── services/             # Axios API client & Firebase config
-    │   └── utils/                # Dynamic host config, colors, and helpers
-    └── .env.example              # Frontend environment variables template
+├── App.js                         # Application root provider & web layout fixes
+├── app.json                       # Expo configuration, plugins, and app metadata
+├── eas.json                       # EAS Build profiles (preview APK / production)
+├── google-services.json           # Firebase Android service credentials
+├── package.json                   # Project dependencies and script shortcuts
+├── assets/                        # App icons, splash graphics, and blog illustrations
+│   └── images/                    # UI assets, avatars, and category covers
+└── src/
+    ├── components/                # 11 Reusable UI components
+    │   ├── AppointmentCard.js     # Booking display card with status badge
+    │   ├── Avatar.js              # Avatar with initials fallback & online dot
+    │   ├── Badge.js               # Status badges (Verified, Pending, etc.)
+    │   ├── BlogCard.js            # Article card with cover image & author
+    │   ├── Button.js              # Standardized primary/secondary button
+    │   ├── Card.js                # Base card container with elevation shadow
+    │   ├── ChatBubble.js          # Chat message bubble with Markdown support
+    │   ├── DoctorCard.js          # Doctor discovery & booking card
+    │   ├── HealthVaultModal.js    # Bottom-sheet modal for vault document sharing
+    │   ├── Input.js               # Form input with icon and error handling
+    │   └── MedicineCard.js        # Medicine reminder schedule card
+    │
+    ├── context/
+    │   └── AuthContext.js         # Global auth state provider & session manager
+    │
+    ├── navigation/                # Role-based navigation flows
+    │   ├── AppNavigator.js        # Root stack router & maintenance interceptor
+    │   ├── AuthNavigator.js       # Auth stack (Splash, Onboarding, Login, Register)
+    │   ├── PatientTabs.js         # Patient 6-tab navigation bar
+    │   ├── DoctorTabs.js          # Doctor 5-tab navigation bar
+    │   └── AdminTabs.js           # Admin 4-tab control bar
+    │
+    ├── screens/                   # 43 Functional application screens
+    │   ├── common/                # Shared & Authentication screens (10 screens)
+    │   │   ├── ForgotPasswordScreen.js
+    │   │   ├── HelpSupportScreen.js
+    │   │   ├── LoginScreen.js
+    │   │   ├── MaintenanceScreen.js
+    │   │   ├── MessagesScreen.js
+    │   │   ├── NotificationScreen.js
+    │   │   ├── OnboardingScreen.js
+    │   │   ├── RegisterScreen.js
+    │   │   ├── RoleSelectionScreen.js
+    │   │   └── SplashScreen.js
+    │   │
+    │   ├── patient/               # Patient portal screens (19 screens)
+    │   │   ├── AppointmentConfirmScreen.js
+    │   │   ├── BMICalculatorScreen.js
+    │   │   ├── BlogDetailScreen.js
+    │   │   ├── BlogFeedScreen.js
+    │   │   ├── DoctorChatScreen.js
+    │   │   ├── DoctorListScreen.js
+    │   │   ├── DoctorProfileScreen.js
+    │   │   ├── EditProfileScreen.js
+    │   │   ├── EmergencyChatScreen.js
+    │   │   ├── HealthRecordsScreen.js
+    │   │   ├── HomeScreen.js
+    │   │   ├── MedicalCardScreen.js
+    │   │   ├── MedicineReminderScreen.js
+    │   │   ├── MyAppointmentsScreen.js
+    │   │   ├── NearestHospitalScreen.js
+    │   │   ├── PrescriptionDetailScreen.js
+    │   │   ├── PrivacyPolicyScreen.js
+    │   │   ├── ProfileScreen.js
+    │   │   └── SavedBlogsScreen.js
+    │   │
+    │   ├── doctor/                # Doctor portal screens (9 screens)
+    │   │   ├── ConsultationSettingsScreen.js
+    │   │   ├── DoctorAppointmentsScreen.js
+    │   │   ├── DoctorHomeScreen.js
+    │   │   ├── DoctorProfileSettingsScreen.js
+    │   │   ├── IncomingRequestScreen.js
+    │   │   ├── PatientChatScreen.js
+    │   │   ├── PatientVaultScreen.js
+    │   │   ├── PrescriptionScreen.js
+    │   │   └── SetAvailabilityScreen.js
+    │   │
+    │   └── admin/                 # Admin control screens (5 screens)
+    │       ├── AdminDashboardScreen.js
+    │       ├── AdminSettingsScreen.js
+    │       ├── BlogEditorScreen.js
+    │       ├── DoctorVerificationScreen.js
+    │       └── PatientDirectoryScreen.js
+    │
+    ├── services/                  # Business logic & Firebase abstractions
+    │   ├── aiService.js           # Banglish/English Clinical Triage engine
+    │   ├── appointmentsApi.js     # Appointment bookings & status updates
+    │   ├── blogsApi.js            # Article publishing, liking & bookmarks
+    │   ├── doctorsApi.js          # Doctor profiles & availability queries
+    │   ├── firebase.js            # Firebase SDK configuration & initialization
+    │   └── notificationService.js # In-app notification dispatcher & listeners
+    │
+    └── utils/                     # Design tokens & asset resolution
+        ├── blogAssets.js          # Blog cover image mapping & fallback loader
+        └── colors.js              # Centralized color tokens & theme definitions
 ```
 
 ---
@@ -80,98 +161,77 @@ HealthConnect/
 ## 🚀 Getting Started
 
 ### Prerequisites
-Make sure you have the following installed:
-- [Node.js](https://nodejs.org/) (v18 or higher)
+- [Node.js](https://nodejs.org/) (v18 or higher recommended)
 - [npm](https://www.npmjs.com/) or [yarn](https://yarnpkg.com/)
-- [Expo Go App](https://expo.dev/go) installed on your Android/iOS device.
+- [Expo Go](https://expo.dev/go) installed on your iOS / Android device
 
 ---
 
-### 1. Clone the Repository
+### 1. Clone & Install
+
 ```bash
-git clone https://github.com/your-username/HealthConnect.git
-cd HealthConnect
+# Clone the repository
+git clone https://github.com/Nibir-Ahmed/HealthConnect-AI.git
+cd HealthConnect-AI/HealthConnect
+
+# Install dependencies
+npm install
 ```
 
 ---
 
-### 2. Backend Setup
-1. Navigate to the backend directory:
-   ```bash
-   cd HealthConnect-Backend
-   ```
-2. Install backend dependencies:
-   ```bash
-   npm install
-   ```
-3. Create a `.env` file based on `.env.example`:
-   ```bash
-   cp .env.example .env
-   ```
-4. Fill in your environment variables in `.env`:
-   ```env
-   PORT=5001
-   JWT_SECRET=supersecretjwtkey123!
-   GROQ_API_KEY=your_groq_api_key_here
-   SKIP_DB_SYNC=true
-   ```
-5. Start the backend development server:
-   ```bash
-   npm run dev
-   ```
-   *The backend will run on `http://localhost:5001`.*
+### 2. Run in Development Mode
 
----
+```bash
+# Start the Expo development server
+npm start
+# or
+npx expo start
+```
 
-### 3. Frontend Setup
-1. Open a new terminal and navigate to the frontend directory:
-   ```bash
-   cd HealthConnect-Frontend
-   ```
-2. Install frontend dependencies:
-   ```bash
-   npm install
-   ```
-3. Start the Expo development bundler:
-   ```bash
-   npx expo start --lan
-   ```
-
----
-
-## 📱 Running on Your Phone
-
-1. Install **Expo Go** on your phone ([Android Play Store](https://play.google.com/store/apps/details?id=host.exp.exponent) / [iOS App Store](https://apps.apple.com/app/expo-go/id982107779)).
-2. Connect your phone and laptop to the **same Wi-Fi network**.
-3. Scan the terminal **QR Code**:
-   - **Android**: Tap **Scan QR Code** inside the Expo Go app.
-   - **iPhone**: Open default **Camera app** and tap the notification banner.
+- **Android Device / Emulator**: Press `a` in the terminal or scan the QR code with **Expo Go**.
+- **iOS Device / Simulator**: Press `i` in the terminal or scan the QR code with the iOS Camera app.
+- **Web Browser**: Press `w` in the terminal to launch the web client at `http://localhost:8081`.
 
 ---
 
 ## 📦 Building Standalone Android APK
 
-To build a standalone installable `.apk` file for Android:
+To build a standalone installable `.apk` file for Android devices:
 
-1. Install EAS CLI:
+1. Install the EAS CLI globally:
    ```bash
    npm install -g eas-cli
    ```
-2. Run the build command inside `HealthConnect-Frontend`:
+2. Authenticate with your Expo account:
+   ```bash
+   eas login
+   ```
+3. Run the cloud preview build:
    ```bash
    npx eas build -p android --profile preview
    ```
-3. Download the generated `.apk` file link and install it directly on your Android phone!
+4. Download the generated `.apk` and install it on your device.
+
+---
+
+## 🔐 Default Admin Credentials
+
+For testing and administrative evaluation:
+- **Email**: `admin@healthconnect.com`
+- **Password**: `123456`
+
+*(Admin portal accounts are automatically bootstrapped with full privileges upon first login).*
 
 ---
 
 ## 🤝 Contributing
 
-Contributions are welcome! Please follow these steps:
-1. Fork the project repository.
-2. Create your feature branch (`git checkout -b feature/AmazingFeature`).
-3. Commit your changes (`git commit -m 'Add some AmazingFeature'`).
-4. Push to the branch (`git push origin feature/AmazingFeature`).
+Contributions are welcome! Follow these steps:
+1. Fork the Project Repository.
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`).
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`).
+4. Push to the Branch (`git push origin feature/AmazingFeature`).
 5. Open a Pull Request.
 
 ---

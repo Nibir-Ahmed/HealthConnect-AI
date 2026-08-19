@@ -5,3 +5,6 @@ yarn-error.log
 .env
 .DS_Store
 serviceAccountKey.json
+*.sqlite
+dist/
+web-build/
